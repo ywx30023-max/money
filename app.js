@@ -77,7 +77,10 @@ function switchPage(page){
   document.getElementById('page-'+page).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.toggle('active',n.dataset.page===page)});
   document.querySelectorAll('.mob-item').forEach(function(n){n.classList.toggle('active',n.dataset.page===page)});
-  document.getElementById('mobileTitle').textContent=pageTitles[page]||page;
+  var mobileTitle=document.getElementById('mobileTitle');
+  if(mobileTitle) mobileTitle.textContent='资产负债表';
+  var mobileSubtitle=document.getElementById('mobileSubtitle');
+  if(mobileSubtitle) mobileSubtitle.textContent='财富自由之路';
   if(page==='dashboard') refreshDashboard();
 }
 
@@ -88,6 +91,12 @@ applyTheme();
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function fmt(n,cur){var s=currencySymbols[cur]||'¥';return s+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function fmtCNY(n){return '¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmtCNYShort(n){
+  var v=Number(n)||0,abs=Math.abs(v);
+  if(abs>=100000000) return '¥'+(v/100000000).toFixed(1)+'亿';
+  if(abs>=10000) return '¥'+(v/10000).toFixed(1)+'万';
+  return '¥'+Math.round(v).toLocaleString('zh-CN');
+}
 
 // 借出款利息计算：优先用手动已收期数，否则按还款日自动算
 function calcLoanInterest(loan){
@@ -368,6 +377,50 @@ function renderIncomes(){
 
 var assetChartInstance=null,liabilityChartInstance=null;
 var chartColors=['#0984e3','#00b894','#fdcb6e','#e17055','#6c5ce7','#00cec9','#fab1a0','#74b9ff'];
+var assetBarColors=['rgba(10,132,255,.92)','rgba(52,199,89,.9)','rgba(0,206,201,.88)','rgba(116,185,255,.9)','rgba(108,92,231,.88)','rgba(142,142,147,.7)'];
+var liabilityBarColors=['rgba(255,69,58,.92)','rgba(255,149,0,.9)','rgba(255,59,48,.84)','rgba(225,112,85,.86)','rgba(253,203,110,.86)','rgba(142,142,147,.7)'];
+
+function buildTopGroups(groups,topN){
+  var rows=Object.keys(groups).map(function(k){return {label:k,value:groups[k]||0}}).filter(function(x){return x.value>0}).sort(function(a,b){return b.value-a.value});
+  if(rows.length===0) return {labels:['暂无数据'],values:[0],percents:[0],isEmpty:true};
+  if(rows.length>topN){
+    var other=rows.slice(topN).reduce(function(s,x){return s+x.value},0);
+    rows=rows.slice(0,topN);
+    if(other>0) rows.push({label:'其他',value:other});
+  }
+  var total=rows.reduce(function(s,x){return s+x.value},0)||1;
+  return {labels:rows.map(function(x){return x.label}),values:rows.map(function(x){return x.value}),percents:rows.map(function(x){return x.value/total*100}),isEmpty:false};
+}
+
+function renderCompositionBarChart(canvasId,instance,chartData,colors){
+  if(instance) instance.destroy();
+  var canvas=document.getElementById(canvasId);
+  if(!canvas) return null;
+  var targetHeight=chartData.isEmpty?220:Math.min(360,Math.max(220,chartData.labels.length*44));
+  canvas.style.height=targetHeight+'px';
+  canvas.style.maxHeight=targetHeight+'px';
+  canvas.style.width='100%';
+  var palette=(colors||chartColors).slice(0,chartData.labels.length);
+  if(chartData.isEmpty) palette=['rgba(174,174,178,.45)'];
+  var style=getComputedStyle(document.body),text=style.getPropertyValue('--text').trim(),text2=style.getPropertyValue('--text2').trim();
+  return new Chart(canvas.getContext('2d'),{
+    type:'bar',
+    data:{labels:chartData.labels,datasets:[{data:chartData.values,backgroundColor:palette,borderRadius:10,borderSkipped:false,maxBarThickness:20}]},
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{enabled:!chartData.isEmpty,callbacks:{label:function(ctx){var i=ctx.dataIndex,p=chartData.percents[i]||0;return fmtCNY(ctx.raw)+' ('+p.toFixed(1)+'%)';}}}
+      },
+      scales:{
+        x:{beginAtZero:true,grid:{color:'rgba(142,142,147,.18)'},border:{display:false},ticks:{color:text2,maxTicksLimit:4,callback:function(v){return fmtCNYShort(v)}}},
+        y:{grid:{display:false},border:{display:false},ticks:{color:text,font:{size:12}}}
+      }
+    }
+  });
+}
 
 function refreshDashboard(){
   var totalA=0;
@@ -409,31 +462,28 @@ function refreshDashboard(){
   cfEl.className='card-value '+(cashFlow>=0?'positive':'negative');
   document.getElementById('cashFlowDetail').innerHTML='被动 '+fmtCNY(passiveIncome)+' + 主动 '+fmtCNY(activeIncome)+' - 支出 '+fmtCNY(monthlyExpense);
 
-  var rows='';
+  var rows='',cards='';
   data.assets.forEach(function(a){
     var cur=a.currency||'CNY';var amtCNY=toCNY(a.amount,cur);var displayAmt=fmt(a.amount,cur);
     if(cur!=='CNY') displayAmt+=' <span style="color:var(--text2);font-size:12px">≈'+fmtCNY(amtCNY)+'</span>';
     rows+='<tr><td><span class="tag tag-asset">资产</span></td><td>'+a.category+'</td><td>'+a.name+'</td><td class="text-right amount">'+displayAmt+'</td></tr>';
+    cards+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+a.name+'</div><div class="m-card-subtitle">资产 · '+a.category+'</div></div><div class="m-card-amount" style="color:var(--success)">'+displayAmt+'</div></div></div>';
   });
-  data.loans.forEach(function(l){var c=calcLoanInterest(l);rows+='<tr><td><span class="tag tag-asset">资产</span></td><td>借出款</td><td>'+l.borrower+' (本息)</td><td class="text-right amount">'+fmtCNY(l.principal+c.interest)+'</td></tr>'});
-  data.liabilities.forEach(function(l){rows+='<tr><td><span class="tag tag-liability">负债</span></td><td>'+l.category+'</td><td>'+l.name+' (剩余)</td><td class="text-right amount">'+fmtCNY(calcRemainingDebt(l))+'</td></tr>'});
-  if(data.incomes) data.incomes.forEach(function(i){rows+='<tr><td><span class="tag tag-income">主动收入</span></td><td>'+i.category+'</td><td>'+i.name+'</td><td class="text-right amount">'+fmtCNY(i.amount)+'/月</td></tr>'});
+  data.loans.forEach(function(l){var c=calcLoanInterest(l),loanAmt=fmtCNY(l.principal+c.interest);rows+='<tr><td><span class="tag tag-asset">资产</span></td><td>借出款</td><td>'+l.borrower+' (本息)</td><td class="text-right amount">'+loanAmt+'</td></tr>';cards+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+l.borrower+' (本息)</div><div class="m-card-subtitle">资产 · 借出款</div></div><div class="m-card-amount" style="color:var(--success)">'+loanAmt+'</div></div></div>'});
+  data.liabilities.forEach(function(l){var remainAmt=fmtCNY(calcRemainingDebt(l));rows+='<tr><td><span class="tag tag-liability">负债</span></td><td>'+l.category+'</td><td>'+l.name+' (剩余)</td><td class="text-right amount">'+remainAmt+'</td></tr>';cards+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+l.name+' (剩余)</div><div class="m-card-subtitle">负债 · '+l.category+'</div></div><div class="m-card-amount" style="color:var(--danger)">'+remainAmt+'</div></div></div>'});
+  if(data.incomes) data.incomes.forEach(function(i){var incomeAmt=fmtCNY(i.amount)+'/月';rows+='<tr><td><span class="tag tag-income">主动收入</span></td><td>'+i.category+'</td><td>'+i.name+'</td><td class="text-right amount">'+incomeAmt+'</td></tr>';cards+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+i.name+'</div><div class="m-card-subtitle">主动收入 · '+i.category+'</div></div><div class="m-card-amount" style="color:var(--warning)">'+incomeAmt+'</div></div></div>'});
   document.getElementById('summaryTable').innerHTML=rows||'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:30px">暂无数据</td></tr>';
+  var summaryCardList=document.getElementById('summaryCardList');
+  if(summaryCardList) summaryCardList.innerHTML=cards||'<div class="empty"><div class="icon">📭</div>暂无数据</div>';
 
   var assetGroups={};
   data.assets.forEach(function(a){var cny=toCNY(a.amount,a.currency||'CNY');assetGroups[a.category]=(assetGroups[a.category]||0)+cny});
   if(loanTotal>0)assetGroups['借出款(本息)']=loanTotal;
-  var aL=Object.keys(assetGroups),aV=aL.map(function(k){return assetGroups[k]});
-  if(assetChartInstance)assetChartInstance.destroy();
-  var ctx1=document.getElementById('assetChart').getContext('2d');
-  assetChartInstance=aL.length>0?new Chart(ctx1,{type:'doughnut',data:{labels:aL,datasets:[{data:aV,backgroundColor:chartColors.slice(0,aL.length),borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:getComputedStyle(document.body).getPropertyValue('--text2').trim(),padding:12,font:{size:12}}}}}}):new Chart(ctx1,{type:'doughnut',data:{labels:['暂无数据'],datasets:[{data:[1],backgroundColor:['#dfe6e9'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:false}}}});
+  assetChartInstance=renderCompositionBarChart('assetChart',assetChartInstance,buildTopGroups(assetGroups,5),assetBarColors);
 
   var liabGroups={};
   data.liabilities.forEach(function(l){liabGroups[l.category]=(liabGroups[l.category]||0)+calcRemainingDebt(l)});
-  var lL=Object.keys(liabGroups),lV=lL.map(function(k){return liabGroups[k]});
-  if(liabilityChartInstance)liabilityChartInstance.destroy();
-  var ctx2=document.getElementById('liabilityChart').getContext('2d');
-  liabilityChartInstance=lL.length>0?new Chart(ctx2,{type:'doughnut',data:{labels:lL,datasets:[{data:lV,backgroundColor:chartColors.slice(0,lL.length),borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:getComputedStyle(document.body).getPropertyValue('--text2').trim(),padding:12,font:{size:12}}}}}}):new Chart(ctx2,{type:'doughnut',data:{labels:['暂无数据'],datasets:[{data:[1],backgroundColor:['#dfe6e9'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:false}}}});
+  liabilityChartInstance=renderCompositionBarChart('liabilityChart',liabilityChartInstance,buildTopGroups(liabGroups,5),liabilityBarColors);
 }
 
 function exportData(){var b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download='balance_sheet_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u)}
@@ -444,3 +494,4 @@ function clearAllData(){if(!confirm('确定要清空所有数据吗？此操作�
 
 refreshAll();
 fetchExchangeRates();
+
