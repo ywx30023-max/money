@@ -2,15 +2,21 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="资产负债表">
+<meta name="theme-color" content="#f5f6fa">
 <title>个人资产负债表</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#f5f6fa;--card:#fff;--text:#2d3436;--text2:#636e72;--border:#dfe6e9;--primary:#0984e3;--success:#00b894;--danger:#d63031;--warning:#fdcb6e;--shadow:0 2px 12px rgba(0,0,0,.08);--radius:12px}
-.dark{--bg:#1a1a2e;--card:#16213e;--text:#eaeaea;--text2:#a0a0b0;--border:#2a2a4a;--shadow:0 2px 12px rgba(0,0,0,.3)}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s}
+:root{--bg:#f2f2f7;--card:#fff;--text:#1c1c1e;--text2:#8e8e93;--text3:#aeaeb2;--border:rgba(60,60,67,.1);--primary:#007aff;--success:#34c759;--danger:#ff3b30;--warning:#ff9500;--shadow:0 1px 3px rgba(0,0,0,.08);--radius:16px;--radius-sm:12px}
+.dark{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--text2:#8e8e93;--text3:#636366;--border:rgba(255,255,255,.08);--primary:#0a84ff;--success:#30d158;--danger:#ff453a;--warning:#ff9f0a;--shadow:none}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','PingFang SC','Helvetica Neue',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s;-webkit-font-smoothing:antialiased}
 .app{display:flex;min-height:100vh}
+
+/* === Desktop Sidebar === */
 .sidebar{width:220px;background:var(--card);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:background .3s}
 .sidebar .logo{padding:0 20px 20px;font-size:18px;font-weight:700;color:var(--primary);border-bottom:1px solid var(--border);margin-bottom:10px}
 .sidebar .logo span{font-size:12px;color:var(--text2);display:block;font-weight:400;margin-top:4px}
@@ -22,21 +28,94 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 .theme-btn{width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:13px;transition:all .2s}
 .theme-btn:hover{border-color:var(--primary)}
 .main{margin-left:220px;flex:1;padding:24px;min-height:100vh}
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--card);border-top:1px solid var(--border);padding:6px 0 env(safe-area-inset-bottom,6px);justify-content:space-around}
-.mobile-nav .mob-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;cursor:pointer;color:var(--text2);font-size:10px;transition:color .2s}
+
+/* === Mobile Header (iOS Navigation Bar) === */
+.mobile-header{display:none;position:fixed;top:0;left:0;right:0;z-index:99;padding:0 16px;padding-top:env(safe-area-inset-top,0);height:calc(44px + env(safe-area-inset-top,0));background:rgba(242,242,247,.85);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:0.5px solid var(--border);font-size:17px;font-weight:600;display:none;justify-content:space-between;align-items:center}
+.dark .mobile-header{background:rgba(0,0,0,.85)}
+.mobile-header .header-inner{display:flex;justify-content:space-between;align-items:center;width:100%;height:44px}
+.mobile-header .theme-toggle{width:32px;height:32px;border-radius:50%;border:none;background:var(--border);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* === Mobile Tab Bar (iOS Style) === */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(242,242,247,.85);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:0.5px solid var(--border);padding:4px 0 env(safe-area-inset-bottom,8px);justify-content:space-around}
+.dark .mobile-nav{background:rgba(0,0,0,.85)}
+.mobile-nav .mob-item{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 2px;cursor:pointer;color:var(--text2);font-size:10px;transition:color .15s;min-width:0;flex:1}
 .mobile-nav .mob-item.active{color:var(--primary)}
-.mobile-nav .mob-item .icon{font-size:20px}
-.mobile-header{display:none;position:fixed;top:0;left:0;right:0;z-index:99;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;font-size:16px;font-weight:600;justify-content:space-between;align-items:center}
-@media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:70px 12px 80px}.mobile-nav{display:flex}.mobile-header{display:flex}}
+.mobile-nav .mob-item .icon{font-size:24px;height:28px;display:flex;align-items:center;justify-content:center}
+.mobile-nav .mob-item .tab-label{font-size:10px;font-weight:500;letter-spacing:-.02em}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .main{margin-left:0;padding:0;padding-top:calc(44px + env(safe-area-inset-top,0));padding-bottom:calc(70px + env(safe-area-inset-bottom,8px))}
+  .mobile-nav{display:flex}
+  .mobile-header{display:flex}
+  .page-content{padding:12px 16px}
+  .page-title{font-size:28px;font-weight:700;margin-bottom:16px;letter-spacing:-.02em}
+
+  /* iOS style cards */
+  .card{border-radius:var(--radius);padding:16px;box-shadow:none;margin-bottom:10px}
+  .card-value{font-size:24px}
+
+  /* Stats grid: 2x2 on mobile */
+  .stats-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important;margin-bottom:16px}
+  .charts-grid{grid-template-columns:1fr;gap:10px}
+
+  /* Summary info bars */
+  .interest-info,.debt-summary,.income-summary{border-radius:var(--radius);padding:14px;margin-bottom:10px}
+  .interest-info .value,.debt-summary .value,.income-summary .value{font-size:18px}
+
+  /* Table as card list on mobile */
+  .table-wrap{overflow-x:visible}
+  .mobile-card-list .m-card{background:var(--card);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:8px;position:relative}
+  .mobile-card-list .m-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .mobile-card-list .m-card-title{font-weight:600;font-size:15px}
+  .mobile-card-list .m-card-subtitle{font-size:13px;color:var(--text2)}
+  .mobile-card-list .m-card-amount{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  .mobile-card-list .m-card-row{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);padding:2px 0}
+  .mobile-card-list .m-card-actions{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border)}
+
+  /* Buttons */
+  .btn{border-radius:var(--radius-sm);padding:10px 18px;font-size:15px}
+  .btn-sm{padding:7px 14px;font-size:13px;border-radius:8px}
+  .flex-between .btn-primary{border-radius:20px;padding:8px 16px;font-size:14px}
+
+  /* Modal as iOS bottom sheet */
+  .modal-overlay.show{align-items:flex-end}
+  .modal{width:100%;max-width:100%;border-radius:16px 16px 0 0;padding:0 16px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0));max-height:92vh;animation:sheetUp .3s ease}
+  .modal::before{content:'';display:block;width:36px;height:5px;background:var(--text3);border-radius:3px;margin:10px auto 14px}
+  .modal-title{font-size:17px;font-weight:600;text-align:center;margin-bottom:18px}
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+  /* Form inputs iOS style */
+  .form-group{margin-bottom:12px}
+  .form-group label{font-size:13px;color:var(--text2);margin-bottom:5px;font-weight:500}
+  .form-group input,.form-group select{height:44px;padding:0 14px;border-radius:var(--radius-sm);font-size:16px;border:0.5px solid var(--border);background:var(--card)}
+  .form-group input:focus,.form-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,122,255,.12)}
+  .form-row{gap:8px}
+  .modal-actions{gap:8px;padding-top:8px}
+  .modal-actions .btn{flex:1;justify-content:center;height:44px;font-size:16px;font-weight:600;border-radius:var(--radius-sm)}
+
+  /* Empty state */
+  .empty{padding:48px 20px}
+  .empty .icon{font-size:56px;margin-bottom:16px}
+
+  /* Hide desktop table, show mobile cards */
+  .desktop-only{display:none!important}
+  .mobile-only{display:block!important}
+}
+
+@media(min-width:769px){
+  .mobile-only{display:none!important}
+  .desktop-only{display:block!important}
+}
+
+/* === Shared Styles === */
 .card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px;transition:background .3s}
-.card-title{font-size:14px;color:var(--text2);margin-bottom:8px}
-.card-value{font-size:28px;font-weight:700}
+.card-title{font-size:13px;color:var(--text2);margin-bottom:6px;font-weight:500}
+.card-value{font-size:28px;font-weight:700;letter-spacing:-.02em}
 .card-value.positive{color:var(--success)}
 .card-value.negative{color:var(--danger)}
 .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
-@media(max-width:768px){.stats-grid{grid-template-columns:1fr}}
 .charts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
-@media(max-width:768px){.charts-grid{grid-template-columns:1fr}}
 .page{display:none}.page.active{display:block}
 .page-title{font-size:22px;font-weight:700;margin-bottom:20px}
 .table-wrap{overflow-x:auto}
@@ -49,7 +128,7 @@ tr:hover{background:var(--bg)}
 .btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{opacity:.85}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
 .btn-sm{padding:5px 10px;font-size:12px}
-.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;justify-content:center;align-items:center}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:200;justify-content:center;align-items:center}
 .modal-overlay.show{display:flex}
 .modal{background:var(--card);border-radius:var(--radius);padding:24px;width:90%;max-width:520px;max-height:90vh;overflow-y:auto}
 .modal-title{font-size:18px;font-weight:700;margin-bottom:16px}
@@ -61,26 +140,27 @@ tr:hover{background:var(--bg)}
 .form-row .form-group{flex:1}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
 .tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600}
-.tag-asset{background:rgba(0,184,148,.15);color:var(--success)}
-.tag-liability{background:rgba(214,48,49,.15);color:var(--danger)}
-.tag-income{background:rgba(253,203,110,.2);color:#e17055}
+.tag-asset{background:rgba(52,199,89,.12);color:var(--success)}
+.tag-liability{background:rgba(255,59,48,.1);color:var(--danger)}
+.tag-income{background:rgba(255,149,0,.12);color:var(--warning)}
 .amount{font-weight:600;font-variant-numeric:tabular-nums}
 .empty{text-align:center;padding:40px 20px;color:var(--text2)}
 .empty .icon{font-size:48px;margin-bottom:12px}
 .flex-between{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .mb-16{margin-bottom:16px}
 .text-right{text-align:right}
-.interest-info{background:linear-gradient(135deg,rgba(9,132,227,.1),rgba(0,184,148,.1));border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.interest-info{background:linear-gradient(135deg,rgba(0,122,255,.08),rgba(52,199,89,.08));border-radius:var(--radius);padding:16px;margin-bottom:16px}
 .interest-info .label{font-size:12px;color:var(--text2)}
 .interest-info .value{font-size:20px;font-weight:700;color:var(--primary)}
-.debt-summary{background:linear-gradient(135deg,rgba(214,48,49,.08),rgba(253,203,110,.08));border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.debt-summary{background:linear-gradient(135deg,rgba(255,59,48,.06),rgba(255,149,0,.06));border-radius:var(--radius);padding:16px;margin-bottom:16px}
 .debt-summary .label{font-size:12px;color:var(--text2)}
 .debt-summary .value{font-size:20px;font-weight:700;color:var(--danger)}
-.income-summary{background:linear-gradient(135deg,rgba(253,203,110,.12),rgba(225,112,85,.08));border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.income-summary{background:linear-gradient(135deg,rgba(255,149,0,.08),rgba(255,59,48,.04));border-radius:var(--radius);padding:16px;margin-bottom:16px}
 .income-summary .label{font-size:12px;color:var(--text2)}
-.income-summary .value{font-size:20px;font-weight:700;color:#e17055}
-.section-divider{border:none;border-top:1px dashed var(--border);margin:14px 0}
+.income-summary .value{font-size:20px;font-weight:700;color:var(--warning)}
+.section-divider{border:none;border-top:0.5px solid var(--border);margin:14px 0}
 .hint{font-size:11px;color:var(--text2);margin-top:2px}
+.page-content{padding:0}
 </style>
 </head>
 <body>
@@ -99,17 +179,19 @@ tr:hover{background:var(--bg)}
 </div>
 
 <div class="mobile-header">
-  <span id="mobileTitle">📊 仪表盘</span>
-  <button class="theme-btn" style="width:auto;padding:6px 12px" onclick="toggleTheme()">🌙</button>
+  <div class="header-inner">
+    <span id="mobileTitle">仪表盘</span>
+    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+  </div>
 </div>
 
 <div class="mobile-nav">
-  <div class="mob-item active" data-page="dashboard"><span class="icon">📊</span>总览</div>
-  <div class="mob-item" data-page="assets"><span class="icon">📈</span>资产</div>
-  <div class="mob-item" data-page="liabilities"><span class="icon">📉</span>负债</div>
-  <div class="mob-item" data-page="loans"><span class="icon">🏦</span>借出</div>
-  <div class="mob-item" data-page="incomes"><span class="icon">💼</span>收入</div>
-  <div class="mob-item" data-page="settings"><span class="icon">⚙️</span>设置</div>
+  <div class="mob-item active" data-page="dashboard"><span class="icon">📊</span><span class="tab-label">总览</span></div>
+  <div class="mob-item" data-page="assets"><span class="icon">📈</span><span class="tab-label">资产</span></div>
+  <div class="mob-item" data-page="liabilities"><span class="icon">📉</span><span class="tab-label">负债</span></div>
+  <div class="mob-item" data-page="loans"><span class="icon">🏦</span><span class="tab-label">借出</span></div>
+  <div class="mob-item" data-page="incomes"><span class="icon">💼</span><span class="tab-label">收入</span></div>
+  <div class="mob-item" data-page="settings"><span class="icon">⚙️</span><span class="tab-label">设置</span></div>
 </div>
 
 <div class="app">
@@ -117,6 +199,7 @@ tr:hover{background:var(--bg)}
 
 <!-- 仪表盘 -->
 <div class="page active" id="page-dashboard">
+  <div class="page-content">
   <div class="page-title">仪表盘</div>
   <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
     <div class="card"><div class="card-title">总资产</div><div class="card-value positive" id="totalAssets">¥0.00</div></div>
@@ -137,10 +220,12 @@ tr:hover{background:var(--bg)}
       </table>
     </div>
   </div>
+  </div>
 </div>
 
 <!-- 资产管理 -->
 <div class="page" id="page-assets">
+  <div class="page-content">
   <div class="flex-between mb-16">
     <div class="page-title" style="margin:0">资产管理</div>
     <button class="btn btn-primary" onclick="openModal('asset')">＋ 添加资产</button>
@@ -153,7 +238,7 @@ tr:hover{background:var(--bg)}
     </div>
     <div id="ratesInfo" style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6"></div>
   </div>
-  <div class="card">
+  <div class="card desktop-only">
     <div class="table-wrap">
       <table>
         <thead><tr><th>类别</th><th>名称</th><th>币种</th><th>金额</th><th>年化收益率</th><th>月收益</th><th>年收益</th><th>备注</th><th>操作</th></tr></thead>
@@ -162,10 +247,13 @@ tr:hover{background:var(--bg)}
     </div>
     <div class="empty" id="assetsEmpty" style="display:none"><div class="icon">📭</div>暂无资产记录，点击上方按钮添加</div>
   </div>
+  <div class="mobile-only mobile-card-list" id="assetsCardList"></div>
+  </div>
 </div>
 
 <!-- 负债管理 -->
 <div class="page" id="page-liabilities">
+  <div class="page-content">
   <div class="flex-between mb-16">
     <div class="page-title" style="margin:0">负债管理</div>
     <button class="btn btn-primary" onclick="openModal('liability')">＋ 添加负债</button>
@@ -176,7 +264,7 @@ tr:hover{background:var(--bg)}
       <div><div class="label">每月还款总额</div><div class="value" id="totalMonthlyPayment">¥0.00</div></div>
     </div>
   </div>
-  <div class="card">
+  <div class="card desktop-only">
     <div class="table-wrap">
       <table>
         <thead><tr><th>类别</th><th>名称</th><th>贷款总额</th><th>总期数</th><th>已还期数</th><th>剩余本金</th><th>月还本金</th><th>月利息</th><th>费率</th><th>还款日</th><th class="text-right">月还总额</th><th>操作</th></tr></thead>
@@ -185,10 +273,13 @@ tr:hover{background:var(--bg)}
     </div>
     <div class="empty" id="liabilitiesEmpty" style="display:none"><div class="icon">📭</div>暂无负债记录，点击上方按钮添加</div>
   </div>
+  <div class="mobile-only mobile-card-list" id="liabilitiesCardList"></div>
+  </div>
 </div>
 
 <!-- 借出款管理 -->
 <div class="page" id="page-loans">
+  <div class="page-content">
   <div class="flex-between mb-16">
     <div class="page-title" style="margin:0">借出款管理</div>
     <button class="btn btn-primary" onclick="openModal('loan')">＋ 添加借出款</button>
@@ -200,7 +291,7 @@ tr:hover{background:var(--bg)}
       <div><div class="label">本息合计</div><div class="value" id="totalLoanAll">¥0.00</div></div>
     </div>
   </div>
-  <div class="card">
+  <div class="card desktop-only">
     <div class="table-wrap">
       <table>
         <thead><tr><th>借款人</th><th>本金</th><th>利率</th><th>利率类型</th><th>起始日期</th><th>还款日</th><th>已收期数</th><th class="text-right">累计利息</th><th>操作</th></tr></thead>
@@ -209,10 +300,13 @@ tr:hover{background:var(--bg)}
     </div>
     <div class="empty" id="loansEmpty" style="display:none"><div class="icon">📭</div>暂无借出款记录</div>
   </div>
+  <div class="mobile-only mobile-card-list" id="loansCardList"></div>
+  </div>
 </div>
 
 <!-- 主动收入 -->
 <div class="page" id="page-incomes">
+  <div class="page-content">
   <div class="flex-between mb-16">
     <div class="page-title" style="margin:0">主动收入</div>
     <button class="btn btn-primary" onclick="openModal('income')">＋ 添加收入</button>
@@ -223,7 +317,7 @@ tr:hover{background:var(--bg)}
       <div><div class="label">年主动收入总额</div><div class="value" id="totalActiveIncomeYear">¥0.00</div></div>
     </div>
   </div>
-  <div class="card">
+  <div class="card desktop-only">
     <div class="table-wrap">
       <table>
         <thead><tr><th>类别</th><th>名称</th><th class="text-right">月收入 (¥)</th><th>备注</th><th>操作</th></tr></thead>
@@ -232,10 +326,13 @@ tr:hover{background:var(--bg)}
     </div>
     <div class="empty" id="incomesEmpty" style="display:none"><div class="icon">📭</div>暂无主动收入记录</div>
   </div>
+  <div class="mobile-only mobile-card-list" id="incomesCardList"></div>
+  </div>
 </div>
 
 <!-- 数据管理 -->
 <div class="page" id="page-settings">
+  <div class="page-content">
   <div class="page-title">数据管理</div>
   <div class="card">
     <h3 style="margin-bottom:12px">导出数据</h3>
@@ -253,6 +350,7 @@ tr:hover{background:var(--bg)}
     <p style="color:var(--text2);font-size:13px;margin-bottom:12px">删除所有资产和负债记录，此操作不可恢复。</p>
     <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有数据</button>
   </div>
+  </div>
 </div>
 
 </div>
@@ -265,8 +363,6 @@ tr:hover{background:var(--bg)}
     <form id="modalForm" onsubmit="saveItem(event)">
       <input type="hidden" id="itemId">
       <input type="hidden" id="itemType">
-
-      <!-- 通用资产/负债表单 -->
       <div id="fieldsGeneral">
         <div class="form-group"><label>类别</label><select id="fieldCategory"><option value="">请选择</option></select></div>
         <div class="form-group"><label>名称</label><input type="text" id="fieldName" placeholder="例如：招商银行活期" required></div>
@@ -291,8 +387,6 @@ tr:hover{background:var(--bg)}
         </div>
         <div class="form-group"><label>备注</label><input type="text" id="fieldNote" placeholder="可选"></div>
       </div>
-
-      <!-- 负债额外字段 -->
       <div id="fieldsLiabilityExtra" style="display:none">
         <hr class="section-divider">
         <div class="form-row">
@@ -305,7 +399,7 @@ tr:hover{background:var(--bg)}
         </div>
         <hr class="section-divider">
         <div class="form-row">
-          <div class="form-group"><label>每月还本金 (¥)</label><input type="number" id="liabMonthlyPrincipal" step="0.01" placeholder="0.00"><div class="hint">贷款总额÷总期数自动算，也可手动填</div></div>
+          <div class="form-group"><label>每月还本金 (¥)</label><input type="number" id="liabMonthlyPrincipal" step="0.01" placeholder="0.00"><div class="hint">贷款总额÷总期数自动算</div></div>
           <div class="form-group"><label>每月利息 (¥)</label><input type="number" id="liabMonthlyInterest" step="0.01" placeholder="0.00"></div>
         </div>
         <div class="form-row">
@@ -313,30 +407,22 @@ tr:hover{background:var(--bg)}
           <div class="form-group"><label>每月还款日</label><input type="number" id="liabRepayDay" min="1" max="31" placeholder="例如：21"></div>
         </div>
       </div>
-
-      <!-- 借出款表单 -->
       <div id="fieldsLoan" style="display:none">
         <div class="form-group"><label>借款人</label><input type="text" id="loanBorrower" placeholder="借给谁"></div>
         <div class="form-group"><label>本金 (¥)</label><input type="number" id="loanPrincipal" step="0.01" placeholder="0.00"></div>
         <div class="form-row">
           <div class="form-group"><label>利率 (%)</label><input type="number" id="loanRate" step="0.01" placeholder="例如：5"></div>
           <div class="form-group"><label>利率类型</label>
-            <select id="loanRateType">
-              <option value="year">年利率</option>
-              <option value="month">月利率</option>
-              <option value="day">日利率</option>
-            </select>
+            <select id="loanRateType"><option value="year">年利率</option><option value="month">月利率</option><option value="day">日利率</option></select>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>起始日期</label><input type="date" id="loanStartDate"></div>
           <div class="form-group"><label>每月还款日</label><input type="number" id="loanRepayDay" min="1" max="31" placeholder="例如：15"><div class="hint">按此日期计算利息周期</div></div>
         </div>
-        <div class="form-group"><label>已收期数</label><input type="number" id="loanPaidPeriods" min="0" placeholder="手动填写已收利息期数"><div class="hint">填写后优先使用此值，不填则系统按还款日自动计算</div></div>
+        <div class="form-group"><label>已收期数</label><input type="number" id="loanPaidPeriods" min="0" placeholder="手动填写已收利息期数"><div class="hint">填写后优先使用此值</div></div>
         <div class="form-group"><label>备注</label><input type="text" id="loanNote" placeholder="可选"></div>
       </div>
-
-      <!-- 主动收入表单 -->
       <div id="fieldsIncome" style="display:none">
         <div class="form-group"><label>类别</label>
           <select id="incomeCategory">
@@ -353,7 +439,6 @@ tr:hover{background:var(--bg)}
         <div class="form-group"><label>月收入 (¥)</label><input type="number" id="incomeAmount" step="0.01" placeholder="0.00"></div>
         <div class="form-group"><label>备注</label><input type="text" id="incomeNote" placeholder="可选"></div>
       </div>
-
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" onclick="closeModal()">取消</button>
         <button type="submit" class="btn btn-primary">保存</button>
@@ -361,7 +446,7 @@ tr:hover{background:var(--bg)}
     </form>
   </div>
 </div>
-
 <script src="app.js"></script>
 </body>
 </html>
+
