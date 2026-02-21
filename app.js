@@ -279,8 +279,9 @@ function refreshAll(){renderAssets();renderLiabilities();renderLoans();renderInc
 function renderAssets(){
   var tb=document.getElementById('assetsTable');
   var empty=document.getElementById('assetsEmpty');
+  var mcl=document.getElementById('assetsCardList');
   if(data.assets.length===0){
-    tb.innerHTML='';empty.style.display='';
+    tb.innerHTML='';empty.style.display='';if(mcl)mcl.innerHTML='<div class="empty"><div class="icon">📭</div>暂无资产记录</div>';
     document.getElementById('totalAssetsSum').textContent=fmtCNY(0);
     document.getElementById('totalMonthlyIncome').textContent=fmtCNY(0);
     document.getElementById('totalAnnualIncome').textContent=fmtCNY(0);
@@ -304,12 +305,15 @@ function renderAssets(){
   document.getElementById('totalAssetsSum').textContent=fmtCNY(sumCNY);
   document.getElementById('totalMonthlyIncome').textContent=fmtCNY(sumMonthly);
   document.getElementById('totalAnnualIncome').textContent=fmtCNY(sumAnnual);
+  // Mobile cards
+  if(mcl){var mc='';data.assets.forEach(function(a){var cur=a.currency||'CNY';var rate=a.annualRate||0;var amtCNY=toCNY(a.amount,cur);var mi=a.amount*rate/100/12;mc+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+a.name+'</div><div class="m-card-subtitle">'+a.category+(cur!=='CNY'?' · '+currencyLabels[cur]:'')+'</div></div><div class="m-card-amount" style="color:var(--success)">'+fmt(a.amount,cur)+'</div></div>'+(cur!=='CNY'?'<div class="m-card-row"><span>折合人民币</span><span>'+fmtCNY(amtCNY)+'</span></div>':'')+(rate?'<div class="m-card-row"><span>年化 '+rate+'%</span><span>月收益 '+fmt(mi,cur)+'</span></div>':'')+(a.note?'<div class="m-card-row"><span>备注</span><span>'+a.note+'</span></div>':'')+'<div class="m-card-actions"><button class="btn btn-outline btn-sm" onclick="openModal(\'asset\',\''+a.id+'\')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteItem(\'asset\',\''+a.id+'\')">删除</button></div></div>'});mcl.innerHTML=mc}
 }
 
 function renderLiabilities(){
   var tb=document.getElementById('liabilitiesTable');
   var empty=document.getElementById('liabilitiesEmpty');
-  if(data.liabilities.length===0){tb.innerHTML='';empty.style.display='';document.getElementById('totalRemainingDebt').textContent=fmtCNY(0);document.getElementById('totalMonthlyPayment').textContent=fmtCNY(0);return}
+  var mcl=document.getElementById('liabilitiesCardList');
+  if(data.liabilities.length===0){tb.innerHTML='';empty.style.display='';if(mcl)mcl.innerHTML='<div class="empty"><div class="icon">📭</div>暂无负债记录</div>';document.getElementById('totalRemainingDebt').textContent=fmtCNY(0);document.getElementById('totalMonthlyPayment').textContent=fmtCNY(0);return}
   empty.style.display='none';
   var sumR=0,sumM=0;
   tb.innerHTML=data.liabilities.map(function(l){
@@ -318,12 +322,14 @@ function renderLiabilities(){
   }).join('');
   document.getElementById('totalRemainingDebt').textContent=fmtCNY(sumR);
   document.getElementById('totalMonthlyPayment').textContent=fmtCNY(sumM);
+  if(mcl){var mc='';data.liabilities.forEach(function(l){var rem=calcRemainingDebt(l),mt=(l.monthlyPrincipal||0)+(l.monthlyInterest||0);mc+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+l.name+'</div><div class="m-card-subtitle">'+l.category+'</div></div><div class="m-card-amount" style="color:var(--danger)">'+fmtCNY(rem)+'</div></div><div class="m-card-row"><span>贷款总额</span><span>'+fmtCNY(l.totalDebt||0)+'</span></div><div class="m-card-row"><span>进度</span><span>'+(l.paidPeriods||0)+'/'+(l.totalPeriods||'-')+'期</span></div><div class="m-card-row"><span>月还款</span><span>'+fmtCNY(mt)+'</span></div>'+(l.repayDay?'<div class="m-card-row"><span>还款日</span><span>每月'+l.repayDay+'号</span></div>':'')+'<div class="m-card-actions"><button class="btn btn-outline btn-sm" onclick="openModal(\'liability\',\''+l.id+'\')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteItem(\'liability\',\''+l.id+'\')">删除</button></div></div>'});mcl.innerHTML=mc}
 }
 
 function renderLoans(){
   var tb=document.getElementById('loansTable');
   var empty=document.getElementById('loansEmpty');
-  if(data.loans.length===0){tb.innerHTML='';empty.style.display='';document.getElementById('totalLoanPrincipal').textContent=fmtCNY(0);document.getElementById('totalLoanInterest').textContent=fmtCNY(0);document.getElementById('totalLoanAll').textContent=fmtCNY(0);return}
+  var mcl=document.getElementById('loansCardList');
+  if(data.loans.length===0){tb.innerHTML='';empty.style.display='';if(mcl)mcl.innerHTML='<div class="empty"><div class="icon">📭</div>暂无借出款记录</div>';document.getElementById('totalLoanPrincipal').textContent=fmtCNY(0);document.getElementById('totalLoanInterest').textContent=fmtCNY(0);document.getElementById('totalLoanAll').textContent=fmtCNY(0);return}
   empty.style.display='none';
   var tP=0,tI=0;
   tb.innerHTML=data.loans.map(function(l){
@@ -336,13 +342,15 @@ function renderLoans(){
   document.getElementById('totalLoanPrincipal').textContent=fmtCNY(tP);
   document.getElementById('totalLoanInterest').textContent=fmtCNY(tI);
   document.getElementById('totalLoanAll').textContent=fmtCNY(tP+tI);
+  if(mcl){var mc='';data.loans.forEach(function(l){var c=calcLoanInterest(l);var pText=c.unit==='day'?c.periods+'天':c.periods+'期';var manualTag=(l.paidPeriods!=null&&l.paidPeriods!=='')?'(手动)':'';mc+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+l.borrower+'</div><div class="m-card-subtitle">'+(rateTypeLabels[l.rateType]||'年利率')+' '+l.rate+'%</div></div><div class="m-card-amount" style="color:var(--primary)">'+fmtCNY(c.interest)+'</div></div><div class="m-card-row"><span>本金</span><span>'+fmtCNY(l.principal)+'</span></div><div class="m-card-row"><span>已收</span><span>'+pText+' '+manualTag+'</span></div>'+(l.repayDay?'<div class="m-card-row"><span>还款日</span><span>每月'+l.repayDay+'号</span></div>':'')+'<div class="m-card-row"><span>起始</span><span>'+l.startDate+'</span></div><div class="m-card-actions"><button class="btn btn-outline btn-sm" onclick="openModal(\'loan\',\''+l.id+'\')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteItem(\'loan\',\''+l.id+'\')">删除</button></div></div>'});mcl.innerHTML=mc}
 }
 
 function renderIncomes(){
   var tb=document.getElementById('incomesTable');
   var empty=document.getElementById('incomesEmpty');
+  var mcl=document.getElementById('incomesCardList');
   if(!data.incomes||data.incomes.length===0){
-    tb.innerHTML='';empty.style.display='';
+    tb.innerHTML='';empty.style.display='';if(mcl)mcl.innerHTML='<div class="empty"><div class="icon">📭</div>暂无主动收入记录</div>';
     document.getElementById('totalActiveIncome').textContent=fmtCNY(0);
     document.getElementById('totalActiveIncomeYear').textContent=fmtCNY(0);
     return;
@@ -355,6 +363,7 @@ function renderIncomes(){
   }).join('');
   document.getElementById('totalActiveIncome').textContent=fmtCNY(sum);
   document.getElementById('totalActiveIncomeYear').textContent=fmtCNY(sum*12);
+  if(mcl){var mc='';data.incomes.forEach(function(i){mc+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+i.name+'</div><div class="m-card-subtitle">'+i.category+'</div></div><div class="m-card-amount" style="color:var(--warning)">'+fmtCNY(i.amount)+'/月</div></div>'+(i.note?'<div class="m-card-row"><span>备注</span><span>'+i.note+'</span></div>':'')+'<div class="m-card-actions"><button class="btn btn-outline btn-sm" onclick="openModal(\'income\',\''+i.id+'\')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteItem(\'income\',\''+i.id+'\')">删除</button></div></div>'});mcl.innerHTML=mc}
 }
 
 var assetChartInstance=null,liabilityChartInstance=null;
