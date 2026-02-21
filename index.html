@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人资产负债表</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f5f6fa;--card:#fff;--text:#2d3436;--text2:#636e72;--border:#dfe6e9;--primary:#0984e3;--success:#00b894;--danger:#d63031;--warning:#fdcb6e;--shadow:0 2px 12px rgba(0,0,0,.08);--radius:12px}
+.dark{--bg:#1a1a2e;--card:#16213e;--text:#eaeaea;--text2:#a0a0b0;--border:#2a2a4a;--shadow:0 2px 12px rgba(0,0,0,.3)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s}
+.app{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--card);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:background .3s}
+.sidebar .logo{padding:0 20px 20px;font-size:18px;font-weight:700;color:var(--primary);border-bottom:1px solid var(--border);margin-bottom:10px}
+.sidebar .logo span{font-size:12px;color:var(--text2);display:block;font-weight:400;margin-top:4px}
+.nav-item{padding:12px 20px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--text2);transition:all .2s;font-size:14px;border-left:3px solid transparent}
+.nav-item:hover{background:var(--bg);color:var(--text)}
+.nav-item.active{color:var(--primary);border-left-color:var(--primary);background:var(--bg);font-weight:600}
+.nav-item .icon{font-size:18px;width:24px;text-align:center}
+.sidebar-footer{margin-top:auto;padding:10px 20px;border-top:1px solid var(--border)}
+.theme-btn{width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:13px;transition:all .2s}
+.theme-btn:hover{border-color:var(--primary)}
+.main{margin-left:220px;flex:1;padding:24px;min-height:100vh}
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--card);border-top:1px solid var(--border);padding:6px 0 env(safe-area-inset-bottom,6px);justify-content:space-around}
+.mobile-nav .mob-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;cursor:pointer;color:var(--text2);font-size:10px;transition:color .2s}
+.mobile-nav .mob-item.active{color:var(--primary)}
+.mobile-nav .mob-item .icon{font-size:20px}
+.mobile-header{display:none;position:fixed;top:0;left:0;right:0;z-index:99;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;font-size:16px;font-weight:600;justify-content:space-between;align-items:center}
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:70px 12px 80px}.mobile-nav{display:flex}.mobile-header{display:flex}}
+.card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px;transition:background .3s}
+.card-title{font-size:14px;color:var(--text2);margin-bottom:8px}
+.card-value{font-size:28px;font-weight:700}
+.card-value.positive{color:var(--success)}
+.card-value.negative{color:var(--danger)}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:768px){.stats-grid{grid-template-columns:1fr}}
+.charts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:768px){.charts-grid{grid-template-columns:1fr}}
+.page{display:none}.page.active{display:block}
+.page-title{font-size:22px;font-weight:700;margin-bottom:20px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+th{color:var(--text2);font-weight:600;font-size:12px;text-transform:uppercase}
+tr:hover{background:var(--bg)}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{opacity:.85}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{opacity:.85}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border-radius:var(--radius);padding:24px;width:90%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:16px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px}
+.form-group input,.form-group select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;outline:none;transition:border .2s}
+.form-group input:focus,.form-group select:focus{border-color:var(--primary)}
+.form-row{display:flex;gap:10px}
+.form-row .form-group{flex:1}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.tag-asset{background:rgba(0,184,148,.15);color:var(--success)}
+.tag-liability{background:rgba(214,48,49,.15);color:var(--danger)}
+.tag-income{background:rgba(253,203,110,.2);color:#e17055}
+.amount{font-weight:600;font-variant-numeric:tabular-nums}
+.empty{text-align:center;padding:40px 20px;color:var(--text2)}
+.empty .icon{font-size:48px;margin-bottom:12px}
+.flex-between{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.mb-16{margin-bottom:16px}
+.text-right{text-align:right}
+.interest-info{background:linear-gradient(135deg,rgba(9,132,227,.1),rgba(0,184,148,.1));border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.interest-info .label{font-size:12px;color:var(--text2)}
+.interest-info .value{font-size:20px;font-weight:700;color:var(--primary)}
+.debt-summary{background:linear-gradient(135deg,rgba(214,48,49,.08),rgba(253,203,110,.08));border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.debt-summary .label{font-size:12px;color:var(--text2)}
+.debt-summary .value{font-size:20px;font-weight:700;color:var(--danger)}
+.income-summary{background:linear-gradient(135deg,rgba(253,203,110,.12),rgba(225,112,85,.08));border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.income-summary .label{font-size:12px;color:var(--text2)}
+.income-summary .value{font-size:20px;font-weight:700;color:#e17055}
+.section-divider{border:none;border-top:1px dashed var(--border);margin:14px 0}
+.hint{font-size:11px;color:var(--text2);margin-top:2px}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">💰 资产负债表<span>个人财务管理工具</span></div>
+  <div class="nav-item active" data-page="dashboard"><span class="icon">📊</span>仪表盘</div>
+  <div class="nav-item" data-page="assets"><span class="icon">📈</span>资产管理</div>
+  <div class="nav-item" data-page="liabilities"><span class="icon">📉</span>负债管理</div>
+  <div class="nav-item" data-page="loans"><span class="icon">🏦</span>借出款管理</div>
+  <div class="nav-item" data-page="incomes"><span class="icon">💼</span>主动收入</div>
+  <div class="nav-item" data-page="settings"><span class="icon">⚙️</span>数据管理</div>
+  <div class="sidebar-footer">
+    <button class="theme-btn" onclick="toggleTheme()">🌙 切换主题</button>
+  </div>
+</div>
+
+<div class="mobile-header">
+  <span id="mobileTitle">📊 仪表盘</span>
+  <button class="theme-btn" style="width:auto;padding:6px 12px" onclick="toggleTheme()">🌙</button>
+</div>
+
+<div class="mobile-nav">
+  <div class="mob-item active" data-page="dashboard"><span class="icon">📊</span>总览</div>
+  <div class="mob-item" data-page="assets"><span class="icon">📈</span>资产</div>
+  <div class="mob-item" data-page="liabilities"><span class="icon">📉</span>负债</div>
+  <div class="mob-item" data-page="loans"><span class="icon">🏦</span>借出</div>
+  <div class="mob-item" data-page="incomes"><span class="icon">💼</span>收入</div>
+  <div class="mob-item" data-page="settings"><span class="icon">⚙️</span>设置</div>
+</div>
+
+<div class="app">
+<div class="main">
+
+<!-- 仪表盘 -->
+<div class="page active" id="page-dashboard">
+  <div class="page-title">仪表盘</div>
+  <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="card"><div class="card-title">总资产</div><div class="card-value positive" id="totalAssets">¥0.00</div></div>
+    <div class="card"><div class="card-title">总负债</div><div class="card-value negative" id="totalLiabilities">¥0.00</div></div>
+    <div class="card"><div class="card-title">净资产</div><div class="card-value" id="netWorth">¥0.00</div></div>
+    <div class="card"><div class="card-title">每月现金流</div><div class="card-value" id="monthlyCashFlow">¥0.00</div><div style="font-size:11px;color:var(--text2);margin-top:4px" id="cashFlowDetail"></div></div>
+  </div>
+  <div class="charts-grid">
+    <div class="card"><div class="card-title">资产构成</div><canvas id="assetChart" height="260"></canvas></div>
+    <div class="card"><div class="card-title">负债构成</div><canvas id="liabilityChart" height="260"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">资产负债明细</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>类别</th><th>类型</th><th>名称</th><th class="text-right">金额 (¥)</th></tr></thead>
+        <tbody id="summaryTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 资产管理 -->
+<div class="page" id="page-assets">
+  <div class="flex-between mb-16">
+    <div class="page-title" style="margin:0">资产管理</div>
+    <button class="btn btn-primary" onclick="openModal('asset')">＋ 添加资产</button>
+  </div>
+  <div class="interest-info">
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><div class="label">资产总额 (折合人民币)</div><div class="value" id="totalAssetsSum">¥0.00</div></div>
+      <div><div class="label">预估月收益</div><div class="value" id="totalMonthlyIncome">¥0.00</div></div>
+      <div><div class="label">预估年收益</div><div class="value" id="totalAnnualIncome">¥0.00</div></div>
+    </div>
+    <div id="ratesInfo" style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6"></div>
+  </div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>类别</th><th>名称</th><th>币种</th><th>金额</th><th>年化收益率</th><th>月收益</th><th>年收益</th><th>备注</th><th>操作</th></tr></thead>
+        <tbody id="assetsTable"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="assetsEmpty" style="display:none"><div class="icon">📭</div>暂无资产记录，点击上方按钮添加</div>
+  </div>
+</div>
+
+<!-- 负债管理 -->
+<div class="page" id="page-liabilities">
+  <div class="flex-between mb-16">
+    <div class="page-title" style="margin:0">负债管理</div>
+    <button class="btn btn-primary" onclick="openModal('liability')">＋ 添加负债</button>
+  </div>
+  <div class="debt-summary">
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><div class="label">剩余负债总额</div><div class="value" id="totalRemainingDebt">¥0.00</div></div>
+      <div><div class="label">每月还款总额</div><div class="value" id="totalMonthlyPayment">¥0.00</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>类别</th><th>名称</th><th>贷款总额</th><th>总期数</th><th>已还期数</th><th>剩余本金</th><th>月还本金</th><th>月利息</th><th>费率</th><th>还款日</th><th class="text-right">月还总额</th><th>操作</th></tr></thead>
+        <tbody id="liabilitiesTable"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="liabilitiesEmpty" style="display:none"><div class="icon">📭</div>暂无负债记录，点击上方按钮添加</div>
+  </div>
+</div>
+
+<!-- 借出款管理 -->
+<div class="page" id="page-loans">
+  <div class="flex-between mb-16">
+    <div class="page-title" style="margin:0">借出款管理</div>
+    <button class="btn btn-primary" onclick="openModal('loan')">＋ 添加借出款</button>
+  </div>
+  <div class="interest-info">
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><div class="label">借出本金总计</div><div class="value" id="totalLoanPrincipal">¥0.00</div></div>
+      <div><div class="label">累计应收利息</div><div class="value" id="totalLoanInterest">¥0.00</div></div>
+      <div><div class="label">本息合计</div><div class="value" id="totalLoanAll">¥0.00</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>借款人</th><th>本金</th><th>利率</th><th>利率类型</th><th>起始日期</th><th>还款日</th><th>已收期数</th><th class="text-right">累计利息</th><th>操作</th></tr></thead>
+        <tbody id="loansTable"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="loansEmpty" style="display:none"><div class="icon">📭</div>暂无借出款记录</div>
+  </div>
+</div>
+
+<!-- 主动收入 -->
+<div class="page" id="page-incomes">
+  <div class="flex-between mb-16">
+    <div class="page-title" style="margin:0">主动收入</div>
+    <button class="btn btn-primary" onclick="openModal('income')">＋ 添加收入</button>
+  </div>
+  <div class="income-summary">
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><div class="label">月主动收入总额</div><div class="value" id="totalActiveIncome">¥0.00</div></div>
+      <div><div class="label">年主动收入总额</div><div class="value" id="totalActiveIncomeYear">¥0.00</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>类别</th><th>名称</th><th class="text-right">月收入 (¥)</th><th>备注</th><th>操作</th></tr></thead>
+        <tbody id="incomesTable"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="incomesEmpty" style="display:none"><div class="icon">📭</div>暂无主动收入记录</div>
+  </div>
+</div>
+
+<!-- 数据管理 -->
+<div class="page" id="page-settings">
+  <div class="page-title">数据管理</div>
+  <div class="card">
+    <h3 style="margin-bottom:12px">导出数据</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:12px">将所有数据导出为 JSON 文件，用于备份或迁移。</p>
+    <button class="btn btn-primary" onclick="exportData()">📥 导出 JSON</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:12px">导入数据</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:12px">从 JSON 文件恢复数据。注意：将覆盖当前所有数据。</p>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 选择文件导入</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:12px;color:var(--danger)">清空数据</h3>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:12px">删除所有资产和负债记录，此操作不可恢复。</p>
+    <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有数据</button>
+  </div>
+</div>
+
+</div>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">添加</div>
+    <form id="modalForm" onsubmit="saveItem(event)">
+      <input type="hidden" id="itemId">
+      <input type="hidden" id="itemType">
+
+      <!-- 通用资产/负债表单 -->
+      <div id="fieldsGeneral">
+        <div class="form-group"><label>类别</label><select id="fieldCategory"><option value="">请选择</option></select></div>
+        <div class="form-group"><label>名称</label><input type="text" id="fieldName" placeholder="例如：招商银行活期" required></div>
+        <div class="form-row">
+          <div class="form-group"><label>币种</label>
+            <select id="fieldCurrency">
+              <option value="CNY">🇨🇳 人民币 (CNY)</option>
+              <option value="USD">🇺🇸 美元 (USD)</option>
+              <option value="EUR">🇪🇺 欧元 (EUR)</option>
+              <option value="GBP">🇬🇧 英镑 (GBP)</option>
+              <option value="JPY">🇯🇵 日元 (JPY)</option>
+              <option value="HKD">🇭🇰 港币 (HKD)</option>
+              <option value="USDT">💲 USDT</option>
+            </select>
+          </div>
+          <div class="form-group" id="fieldAmountGroup"><label>金额</label><input type="number" id="fieldAmount" step="0.01" placeholder="0.00" required></div>
+        </div>
+        <div id="fieldsAssetExtra" style="display:none">
+          <div class="form-row">
+            <div class="form-group"><label>年化收益率 (%)</label><input type="number" id="assetAnnualRate" step="0.01" placeholder="例如：2.5"><div class="hint">填写后自动计算月/年收益</div></div>
+          </div>
+        </div>
+        <div class="form-group"><label>备注</label><input type="text" id="fieldNote" placeholder="可选"></div>
+      </div>
+
+      <!-- 负债额外字段 -->
+      <div id="fieldsLiabilityExtra" style="display:none">
+        <hr class="section-divider">
+        <div class="form-row">
+          <div class="form-group"><label>贷款总额 (¥)</label><input type="number" id="liabTotalDebt" step="0.01" placeholder="例如：324000"></div>
+          <div class="form-group"><label>总期数 (月)</label><input type="number" id="liabTotalPeriods" min="1" placeholder="例如：60"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>已还期数</label><input type="number" id="liabPaidPeriods" min="0" placeholder="例如：12"></div>
+          <div class="form-group"><label>起始日期</label><input type="date" id="liabStartDate"></div>
+        </div>
+        <hr class="section-divider">
+        <div class="form-row">
+          <div class="form-group"><label>每月还本金 (¥)</label><input type="number" id="liabMonthlyPrincipal" step="0.01" placeholder="0.00"><div class="hint">贷款总额÷总期数自动算，也可手动填</div></div>
+          <div class="form-group"><label>每月利息 (¥)</label><input type="number" id="liabMonthlyInterest" step="0.01" placeholder="0.00"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>费率 (%)</label><input type="number" id="liabFeeRate" step="0.001" placeholder="例如：0.433"></div>
+          <div class="form-group"><label>每月还款日</label><input type="number" id="liabRepayDay" min="1" max="31" placeholder="例如：21"></div>
+        </div>
+      </div>
+
+      <!-- 借出款表单 -->
+      <div id="fieldsLoan" style="display:none">
+        <div class="form-group"><label>借款人</label><input type="text" id="loanBorrower" placeholder="借给谁"></div>
+        <div class="form-group"><label>本金 (¥)</label><input type="number" id="loanPrincipal" step="0.01" placeholder="0.00"></div>
+        <div class="form-row">
+          <div class="form-group"><label>利率 (%)</label><input type="number" id="loanRate" step="0.01" placeholder="例如：5"></div>
+          <div class="form-group"><label>利率类型</label>
+            <select id="loanRateType">
+              <option value="year">年利率</option>
+              <option value="month">月利率</option>
+              <option value="day">日利率</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>起始日期</label><input type="date" id="loanStartDate"></div>
+          <div class="form-group"><label>每月还款日</label><input type="number" id="loanRepayDay" min="1" max="31" placeholder="例如：15"><div class="hint">按此日期计算利息周期</div></div>
+        </div>
+        <div class="form-group"><label>已收期数</label><input type="number" id="loanPaidPeriods" min="0" placeholder="手动填写已收利息期数"><div class="hint">填写后优先使用此值，不填则系统按还款日自动计算</div></div>
+        <div class="form-group"><label>备注</label><input type="text" id="loanNote" placeholder="可选"></div>
+      </div>
+
+      <!-- 主动收入表单 -->
+      <div id="fieldsIncome" style="display:none">
+        <div class="form-group"><label>类别</label>
+          <select id="incomeCategory">
+            <option value="">请选择</option>
+            <option value="打工/上班">打工/上班</option>
+            <option value="企业经营">企业经营</option>
+            <option value="公司分红">公司分红</option>
+            <option value="兼职副业">兼职副业</option>
+            <option value="自由职业">自由职业</option>
+            <option value="其他收入">其他收入</option>
+          </select>
+        </div>
+        <div class="form-group"><label>名称</label><input type="text" id="incomeName" placeholder="例如：XX公司工资"></div>
+        <div class="form-group"><label>月收入 (¥)</label><input type="number" id="incomeAmount" step="0.01" placeholder="0.00"></div>
+        <div class="form-group"><label>备注</label><input type="text" id="incomeNote" placeholder="可选"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">取消</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
