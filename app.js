@@ -541,4 +541,3 @@ function clearAllData(){if(!confirm('确定要清空所有数据吗？此操作�
 
 refreshAll();
 fetchExchangeRates();
-
