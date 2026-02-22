@@ -1,523 +1,543 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="资产负债表">
-<meta name="theme-color" content="#f2f2f7">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>个人资产负债表</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<style>
-:root{--bg:#f2f2f7;--card:#fff;--text:#1c1c1e;--text2:#8e8e93;--text3:#aeaeb2;--border:rgba(60,60,67,.1);--primary:#007aff;--success:#34c759;--danger:#ff3b30;--warning:#ff9500;--shadow:0 1px 3px rgba(0,0,0,.08);--radius:16px;--radius-sm:12px}
-.dark{--bg:#000;--card:#1c1c1e;--text:#f5f5f7;--text2:#8e8e93;--text3:#636366;--border:rgba(255,255,255,.08);--primary:#0a84ff;--success:#30d158;--danger:#ff453a;--warning:#ff9f0a;--shadow:none}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','PingFang SC','Helvetica Neue',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s;-webkit-font-smoothing:antialiased}
-.app{display:flex;min-height:100vh}
+var STORAGE_KEY = 'balance_sheet_data';
+var defaultData = {assets:[],liabilities:[],loans:[],incomes:[],theme:'light'};
+var currencySymbols={CNY:'¥',USD:'$',EUR:'€',GBP:'£',JPY:'¥',HKD:'HK$',USDT:'₮'};
+var currencyLabels={CNY:'人民币',USD:'美元',EUR:'欧元',GBP:'英镑',JPY:'日元',HKD:'港币',USDT:'USDT'};
 
-/* === Desktop Sidebar === */
-.sidebar{width:220px;background:var(--card);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:background .3s}
-.sidebar .logo{padding:0 20px 20px;font-size:18px;font-weight:700;color:var(--primary);border-bottom:1px solid var(--border);margin-bottom:10px}
-.sidebar .logo span{font-size:12px;color:var(--text2);display:block;font-weight:400;margin-top:4px}
-.nav-item{padding:12px 20px;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--text2);transition:all .2s;font-size:14px;border-left:3px solid transparent}
-.nav-item:hover{background:var(--bg);color:var(--text)}
-.nav-item.active{color:var(--primary);border-left-color:var(--primary);background:var(--bg);font-weight:600}
-.nav-item .icon{font-size:18px;width:24px;text-align:center}
-.sidebar-footer{margin-top:auto;padding:10px 20px;border-top:1px solid var(--border)}
-.theme-btn{width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:13px;transition:all .2s}
-.theme-btn:hover{border-color:var(--primary)}
-.main{margin-left:220px;flex:1;padding:24px;min-height:100vh}
+var defaultRates={CNY:1,USD:7.25,EUR:7.85,GBP:9.15,JPY:0.048,HKD:0.93,USDT:7.25};
+var exchangeRates=Object.assign({},defaultRates);
+var ratesUpdateTime='使用默认汇率';
 
-/* === Mobile Header (iOS Navigation Bar) === */
-.mobile-header{display:none;position:fixed;top:0;left:0;right:0;z-index:99;padding:0 16px;padding-top:env(safe-area-inset-top,0);height:calc(56px + env(safe-area-inset-top,0));background:rgba(242,242,247,.85);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:0.5px solid var(--border);display:none;justify-content:space-between;align-items:center}
-.dark .mobile-header{background:rgba(0,0,0,.85)}
-.mobile-header .header-inner{display:flex;justify-content:space-between;align-items:center;width:100%;height:56px}
-.mobile-header .mobile-brand{min-width:0;display:flex;flex-direction:column;justify-content:center}
-.mobile-header .mobile-brand-title{font-size:18px;font-weight:700;line-height:1.15;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mobile-header .mobile-brand-subtitle{font-size:11px;color:var(--text2);line-height:1.2;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mobile-header .theme-toggle{width:32px;height:32px;border-radius:50%;border:none;background:var(--border);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+function loadData(){
+  try{var d=JSON.parse(localStorage.getItem(STORAGE_KEY));return d?Object.assign({},defaultData,d):Object.assign({},defaultData)}
+  catch(e){return Object.assign({},defaultData)}
+}
+function saveStore(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}
 
-/* === Mobile Tab Bar (iOS Style) === */
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(242,242,247,.85);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:0.5px solid var(--border);padding:4px 0 env(safe-area-inset-bottom,8px);justify-content:space-around}
-.dark .mobile-nav{background:rgba(0,0,0,.85)}
-.mobile-nav .mob-item{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 2px;cursor:pointer;color:var(--text2);font-size:10px;transition:color .15s;min-width:0;flex:1}
-.mobile-nav .mob-item.active{color:var(--primary)}
-.mobile-nav .mob-item .icon{font-size:24px;height:28px;display:flex;align-items:center;justify-content:center}
-.mobile-nav .mob-item .tab-label{font-size:10px;font-weight:500;letter-spacing:-.02em}
+var data = loadData();
+if(!data.incomes) data.incomes=[];
 
-@media(max-width:768px){
-  .sidebar{display:none}
-  .main{margin-left:0;padding:0;padding-top:calc(56px + env(safe-area-inset-top,0));padding-bottom:calc(70px + env(safe-area-inset-bottom,8px))}
-  .mobile-nav{display:flex}
-  .mobile-header{display:flex}
-  .page-content{padding:12px 16px}
-  .page-title{font-size:28px;font-weight:700;margin-bottom:16px;letter-spacing:-.02em}
-  #page-dashboard .page-title{display:none}
+var assetCategories=['现金及银行存款','货币基金','基金投资','股票投资','数字货币','理财产品','借出款','固定资产','其他资产'];
+var liabilityCategories=['信用卡欠款','借入款','房贷','车贷','消费贷','其他负债'];
+var pageTitles={dashboard:'📊 仪表盘',assets:'📈 资产管理',liabilities:'📉 负债管理',loans:'🏦 借出款管理',incomes:'💼 主动收入',settings:'⚙️ 数据管理'};
+var rateTypeLabels={year:'年利率',month:'月利率',day:'日利率'};
 
-  /* iOS style cards */
-  .card{border-radius:var(--radius);padding:16px;box-shadow:none;margin-bottom:10px}
-  .card-value{font-size:24px}
-
-  /* Stats grid: 2x2 on mobile */
-  .stats-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important;margin-bottom:16px}
-  .charts-grid{grid-template-columns:1fr;gap:10px}
-
-  /* Summary info bars */
-  .interest-info,.debt-summary,.income-summary{border-radius:var(--radius);padding:14px;margin-bottom:10px}
-  .interest-info .value,.debt-summary .value,.income-summary .value{font-size:18px}
-
-  /* Table as card list on mobile */
-  .table-wrap{overflow-x:visible}
-  .mobile-card-list .m-card{background:var(--card);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:8px;position:relative}
-  .mobile-card-list .m-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-  .mobile-card-list .m-card-title{font-weight:600;font-size:15px}
-  .mobile-card-list .m-card-subtitle{font-size:13px;color:var(--text2)}
-  .mobile-card-list .m-card-amount{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
-  .mobile-card-list .m-card-row{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);padding:2px 0}
-  .mobile-card-list .m-card-actions{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border)}
-
-  /* Buttons */
-  .btn{border-radius:var(--radius-sm);padding:10px 18px;font-size:15px}
-  .btn-sm{padding:7px 14px;font-size:13px;border-radius:8px}
-  .flex-between .btn-primary{border-radius:20px;padding:8px 16px;font-size:14px}
-
-  /* Modal as iOS bottom sheet */
-  .modal-overlay.show{align-items:flex-end}
-  .modal{width:100%;max-width:100%;border-radius:16px 16px 0 0;padding:0 16px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0));max-height:92vh;animation:sheetUp .3s ease}
-  .modal::before{content:'';display:block;width:36px;height:5px;background:var(--text3);border-radius:3px;margin:10px auto 14px}
-  .modal-title{font-size:17px;font-weight:600;text-align:center;margin-bottom:18px}
-  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-
-  /* Form inputs iOS style */
-  .form-group{margin-bottom:12px}
-  .form-group label{font-size:13px;color:var(--text2);margin-bottom:5px;font-weight:500}
-  .form-group input,.form-group select{height:44px;padding:0 14px;border-radius:var(--radius-sm);font-size:16px;border:0.5px solid var(--border);background:var(--card)}
-  .form-group input:focus,.form-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,122,255,.12)}
-  .form-row{gap:8px}
-  .modal-actions{gap:8px;padding-top:8px}
-  .modal-actions .btn{flex:1;justify-content:center;height:44px;font-size:16px;font-weight:600;border-radius:var(--radius-sm)}
-
-  /* Empty state */
-  .empty{padding:48px 20px}
-  .empty .icon{font-size:56px;margin-bottom:16px}
-
-  /* Hide desktop table, show mobile cards */
-  .desktop-only{display:none!important}
-  .mobile-only{display:block!important}
+function fetchExchangeRates(){
+  fetch('https://api.exchangerate-api.com/v4/latest/CNY')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d&&d.rates){
+        var r=d.rates;
+        exchangeRates.CNY=1;
+        if(r.USD) exchangeRates.USD=1/r.USD;
+        if(r.EUR) exchangeRates.EUR=1/r.EUR;
+        if(r.GBP) exchangeRates.GBP=1/r.GBP;
+        if(r.JPY) exchangeRates.JPY=1/r.JPY;
+        if(r.HKD) exchangeRates.HKD=1/r.HKD;
+        exchangeRates.USDT=exchangeRates.USD;
+        ratesUpdateTime='实时汇率 · '+new Date().toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+        updateRatesDisplay();refreshAll();
+      }
+    })
+    .catch(function(){
+      fetch('https://open.er-api.com/v6/latest/CNY')
+        .then(function(r){return r.json()})
+        .then(function(d){
+          if(d&&d.rates){
+            var r=d.rates;exchangeRates.CNY=1;
+            if(r.USD) exchangeRates.USD=1/r.USD;
+            if(r.EUR) exchangeRates.EUR=1/r.EUR;
+            if(r.GBP) exchangeRates.GBP=1/r.GBP;
+            if(r.JPY) exchangeRates.JPY=1/r.JPY;
+            if(r.HKD) exchangeRates.HKD=1/r.HKD;
+            exchangeRates.USDT=exchangeRates.USD;
+            ratesUpdateTime='实时汇率 · '+new Date().toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+            updateRatesDisplay();refreshAll();
+          }
+        }).catch(function(){ratesUpdateTime='离线默认汇率';updateRatesDisplay()});
+    });
 }
 
-@media(min-width:769px){
-  .mobile-only{display:none!important}
-  .desktop-only{display:block!important}
+function updateRatesDisplay(){
+  var el=document.getElementById('ratesInfo');
+  if(el){
+    var parts=[];
+    Object.keys(exchangeRates).forEach(function(k){if(k!=='CNY') parts.push(currencyLabels[k]+': 1=¥'+exchangeRates[k].toFixed(4))});
+    el.textContent=ratesUpdateTime+' | '+parts.join(' · ');
+  }
 }
 
-/* === Shared Styles === */
-.card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px;transition:background .3s}
-.card-title{font-size:13px;color:var(--text2);margin-bottom:6px;font-weight:500}
-.card-value{font-size:28px;font-weight:700;letter-spacing:-.02em}
-.card-value.positive{color:var(--success)}
-.card-value.negative{color:var(--danger)}
-.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
-.charts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
-.page{display:none}.page.active{display:block}
-.page-title{font-size:22px;font-weight:700;margin-bottom:20px}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
-th{color:var(--text2);font-weight:600;font-size:12px;text-transform:uppercase}
-tr:hover{background:var(--bg)}
-.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
-.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{opacity:.85}
-.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{opacity:.85}
-.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
-.btn-sm{padding:5px 10px;font-size:12px}
-.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:200;justify-content:center;align-items:center}
-.modal-overlay.show{display:flex}
-.modal{background:var(--card);border-radius:var(--radius);padding:24px;width:90%;max-width:520px;max-height:90vh;overflow-y:auto}
-.modal-title{font-size:18px;font-weight:700;margin-bottom:16px}
-.form-group{margin-bottom:14px}
-.form-group label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px}
-.form-group input,.form-group select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;outline:none;transition:border .2s}
-.form-group input:focus,.form-group select:focus{border-color:var(--primary)}
-.form-row{display:flex;gap:10px}
-.form-row .form-group{flex:1}
-.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
-.tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600}
-.tag-asset{background:rgba(52,199,89,.12);color:var(--success)}
-.tag-liability{background:rgba(255,59,48,.1);color:var(--danger)}
-.tag-income{background:rgba(255,149,0,.12);color:var(--warning)}
-.amount{font-weight:600;font-variant-numeric:tabular-nums}
-.empty{text-align:center;padding:40px 20px;color:var(--text2)}
-.empty .icon{font-size:48px;margin-bottom:12px}
-.flex-between{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-.mb-16{margin-bottom:16px}
-.text-right{text-align:right}
-.interest-info{background:linear-gradient(135deg,rgba(0,122,255,.08),rgba(52,199,89,.08));border-radius:var(--radius);padding:16px;margin-bottom:16px}
-.interest-info .label{font-size:12px;color:var(--text2)}
-.interest-info .value{font-size:20px;font-weight:700;color:var(--primary)}
-.debt-summary{background:linear-gradient(135deg,rgba(255,59,48,.06),rgba(255,149,0,.06));border-radius:var(--radius);padding:16px;margin-bottom:16px}
-.debt-summary .label{font-size:12px;color:var(--text2)}
-.debt-summary .value{font-size:20px;font-weight:700;color:var(--danger)}
-.income-summary{background:linear-gradient(135deg,rgba(255,149,0,.08),rgba(255,59,48,.04));border-radius:var(--radius);padding:16px;margin-bottom:16px}
-.income-summary .label{font-size:12px;color:var(--text2)}
-.income-summary .value{font-size:20px;font-weight:700;color:var(--warning)}
-.section-divider{border:none;border-top:0.5px solid var(--border);margin:14px 0}
-.hint{font-size:11px;color:var(--text2);margin-top:2px}
-.page-content{padding:0}
+function toCNY(amount,currency){return amount*(exchangeRates[currency||'CNY']||1)}
 
-/* Keep responsive rules at the end so they are not overridden by base styles */
-@media(max-width:768px){
-  .sidebar{display:none}
-  .main{margin-left:0;padding:0;padding-top:calc(56px + env(safe-area-inset-top,0));padding-bottom:calc(70px + env(safe-area-inset-bottom,8px))}
-  .mobile-nav{display:flex}
-  .mobile-header{display:flex}
-  .page-content{padding:12px 16px}
-  .page-title{font-size:28px;font-weight:700;margin-bottom:16px;letter-spacing:-.02em}
-  #page-dashboard .page-title{display:none}
+document.querySelectorAll('.nav-item,.mob-item').forEach(function(el){
+  el.addEventListener('click',function(){switchPage(el.dataset.page)});
+});
 
-  .card{border-radius:var(--radius);padding:16px;box-shadow:none;margin-bottom:10px}
-  .card-value{font-size:24px}
-  .stats-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important;margin-bottom:16px}
-  .charts-grid{grid-template-columns:1fr;gap:10px}
-
-  .interest-info,.debt-summary,.income-summary{border-radius:var(--radius);padding:14px;margin-bottom:10px}
-  .interest-info .value,.debt-summary .value,.income-summary .value{font-size:18px}
-
-  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-
-  .mobile-card-list .m-card{background:var(--card);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:8px;position:relative}
-  .mobile-card-list .m-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-  .mobile-card-list .m-card-title{font-weight:600;font-size:15px}
-  .mobile-card-list .m-card-subtitle{font-size:13px;color:var(--text2)}
-  .mobile-card-list .m-card-amount{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
-  .mobile-card-list .m-card-row{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);padding:2px 0}
-  .mobile-card-list .m-card-actions{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border)}
-
-  .btn{border-radius:var(--radius-sm);padding:10px 18px;font-size:15px}
-  .btn-sm{padding:7px 14px;font-size:13px;border-radius:8px}
-  .flex-between .btn-primary{border-radius:20px;padding:8px 16px;font-size:14px}
-
-  .modal-overlay.show{align-items:flex-end}
-  .modal{width:100%;max-width:100%;border-radius:16px 16px 0 0;padding:0 16px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0));max-height:92vh;animation:sheetUp .3s ease}
-  .modal::before{content:'';display:block;width:36px;height:5px;background:var(--text3);border-radius:3px;margin:10px auto 14px}
-  .modal-title{font-size:17px;font-weight:600;text-align:center;margin-bottom:18px}
-
-  .form-group{margin-bottom:12px}
-  .form-group label{font-size:13px;color:var(--text2);margin-bottom:5px;font-weight:500}
-  .form-group input,.form-group select{height:44px;padding:0 14px;border-radius:var(--radius-sm);font-size:16px;border:0.5px solid var(--border);background:var(--card)}
-  .form-group input:focus,.form-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,122,255,.12)}
-  .form-row{gap:8px}
-  .modal-actions{gap:8px;padding-top:8px}
-  .modal-actions .btn{flex:1;justify-content:center;height:44px;font-size:16px;font-weight:600;border-radius:var(--radius-sm)}
-
-  .empty{padding:48px 20px}
-  .empty .icon{font-size:56px;margin-bottom:16px}
-
-  .desktop-only{display:none!important}
-  .mobile-only{display:block!important}
+function switchPage(page){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.toggle('active',n.dataset.page===page)});
+  document.querySelectorAll('.mob-item').forEach(function(n){n.classList.toggle('active',n.dataset.page===page)});
+  var mobileTitle=document.getElementById('mobileTitle');
+  if(mobileTitle) mobileTitle.textContent='资产负债表';
+  var mobileSubtitle=document.getElementById('mobileSubtitle');
+  if(mobileSubtitle) mobileSubtitle.textContent='财富自由之路';
+  if(page==='dashboard') refreshDashboard();
 }
 
-@media(min-width:769px){
-  .mobile-only{display:none!important}
-  .desktop-only{display:block!important}
+function toggleTheme(){data.theme=data.theme==='dark'?'light':'dark';applyTheme();saveStore()}
+function applyTheme(){document.body.classList.toggle('dark',data.theme==='dark')}
+applyTheme();
+
+function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function fmt(n,cur){var s=currencySymbols[cur]||'¥';return s+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmtCNY(n){return '¥'+Number(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmtCNYShort(n){
+  var v=Number(n)||0,abs=Math.abs(v);
+  if(abs>=100000000) return '¥'+(v/100000000).toFixed(1)+'亿';
+  if(abs>=10000) return '¥'+(v/10000).toFixed(1)+'万';
+  return '¥'+Math.round(v).toLocaleString('zh-CN');
 }
-</style>
-</head>
-<body>
+function parseYMD(s){
+  if(!s||typeof s!=='string') return null;
+  var p=s.split('-');if(p.length!==3) return null;
+  var y=parseInt(p[0],10),m=parseInt(p[1],10),d=parseInt(p[2],10);
+  if(!y||!m||!d) return null;
+  return new Date(y,m-1,d);
+}
+function startOfToday(){
+  var n=new Date();
+  return new Date(n.getFullYear(),n.getMonth(),n.getDate());
+}
+function clampDays(n){n=Math.floor(Number(n)||0);return n<0?0:n}
+function assetTermMeta(a){
+  var start=parseYMD(a.startDate),end=parseYMD(a.endDate);
+  if(!start||!end||end<start) return null;
+  var today=startOfToday();
+  var started=today>=start,ended=today>end,active=(today>=start&&today<=end);
+  var accrualEnd=today<start?start:(today>end?end:today);
+  var daysAccrued=clampDays((accrualEnd-start)/86400000);
+  var daysLeft=active?clampDays((end-today)/86400000):0;
+  return {start:start,end:end,started:started,ended:ended,active:active,daysAccrued:daysAccrued,daysLeft:daysLeft};
+}
 
-<div class="sidebar">
-  <div class="logo">💰 资产负债表<span>个人财务管理工具</span></div>
-  <div class="nav-item active" data-page="dashboard"><span class="icon">📊</span>仪表盘</div>
-  <div class="nav-item" data-page="assets"><span class="icon">📈</span>资产管理</div>
-  <div class="nav-item" data-page="liabilities"><span class="icon">📉</span>负债管理</div>
-  <div class="nav-item" data-page="loans"><span class="icon">🏦</span>借出款管理</div>
-  <div class="nav-item" data-page="incomes"><span class="icon">💼</span>主动收入</div>
-  <div class="nav-item" data-page="settings"><span class="icon">⚙️</span>数据管理</div>
-  <div class="sidebar-footer">
-    <button class="theme-btn" onclick="toggleTheme()">🌙 切换主题</button>
-  </div>
-</div>
+// 借出款利息计算：优先用手动已收期数，否则按还款日自动算
+function calcLoanInterest(loan){
+  var start=new Date(loan.startDate),now=new Date();
+  var days=Math.max(0,Math.floor((now-start)/86400000));
+  var rateType=loan.rateType||'year';
 
-<div class="mobile-header">
-  <div class="header-inner">
-    <div class="mobile-brand">
-      <div class="mobile-brand-title" id="mobileTitle">资产负债表</div>
-      <div class="mobile-brand-subtitle" id="mobileSubtitle">财富自由之路</div>
-    </div>
-    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
-  </div>
-</div>
+  // 日利率特殊处理
+  if(rateType==='day'){
+    var paidP=loan.paidPeriods;
+    var useDays=(paidP!=null&&paidP!==''&&paidP>=0)?paidP:days;
+    return {days:days,periods:useDays,interest:loan.principal*(loan.rate/100)*useDays,unit:'day'};
+  }
 
-<div class="mobile-nav">
-  <div class="mob-item active" data-page="dashboard"><span class="icon">📊</span><span class="tab-label">总览</span></div>
-  <div class="mob-item" data-page="assets"><span class="icon">📈</span><span class="tab-label">资产</span></div>
-  <div class="mob-item" data-page="liabilities"><span class="icon">📉</span><span class="tab-label">负债</span></div>
-  <div class="mob-item" data-page="loans"><span class="icon">🏦</span><span class="tab-label">借出</span></div>
-  <div class="mob-item" data-page="incomes"><span class="icon">💼</span><span class="tab-label">收入</span></div>
-  <div class="mob-item" data-page="settings"><span class="icon">⚙️</span><span class="tab-label">设置</span></div>
-</div>
+  // 月/年利率：计算期数
+  var periods=0;
+  var paidPeriods=loan.paidPeriods;
 
-<div class="app">
-<div class="main">
+  if(paidPeriods!=null&&paidPeriods!==''&&paidPeriods>=0){
+    // 手动输入优先
+    periods=parseInt(paidPeriods);
+  } else if(loan.repayDay&&loan.startDate){
+    // 按还款日自动计算完整周期数
+    var repayDay=parseInt(loan.repayDay);
+    var y=start.getFullYear(),m=start.getMonth();
+    // 找到第一个还款日
+    var firstRepay=new Date(y,m,repayDay);
+    if(firstRepay<=start){
+      // 起始日在还款日当天或之后，第一个还款日是下个月
+      m++;
+      firstRepay=new Date(y,m,repayDay);
+    }
+    // 从第一个还款日开始数完整周期
+    periods=0;
+    var checkDate=new Date(firstRepay);
+    while(checkDate<=now){
+      periods++;
+      checkDate=new Date(firstRepay.getFullYear(),firstRepay.getMonth()+periods,repayDay);
+    }
+  } else {
+    // 无还款日，按旧逻辑
+    periods=(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth());
+    if(periods<0) periods=0;
+    periods+=1;
+  }
 
-<!-- 仪表盘 -->
-<div class="page active" id="page-dashboard">
-  <div class="page-content">
-  <div class="page-title">仪表盘</div>
-  <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
-    <div class="card"><div class="card-title">总资产</div><div class="card-value positive" id="totalAssets">¥0.00</div></div>
-    <div class="card"><div class="card-title">总负债</div><div class="card-value negative" id="totalLiabilities">¥0.00</div></div>
-    <div class="card"><div class="card-title">净资产</div><div class="card-value" id="netWorth">¥0.00</div></div>
-    <div class="card"><div class="card-title">每月现金流</div><div class="card-value" id="monthlyCashFlow">¥0.00</div><div style="font-size:11px;color:var(--text2);margin-top:4px" id="cashFlowDetail"></div></div>
-  </div>
-  <div class="charts-grid">
-    <div class="card"><div class="card-title">资产构成（Top 5）</div><canvas id="assetChart" height="260"></canvas></div>
-    <div class="card"><div class="card-title">负债构成（Top 5）</div><canvas id="liabilityChart" height="260"></canvas></div>
-  </div>
-  <div class="card desktop-only">
-    <div class="card-title">资产负债明细</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>类别</th><th>类型</th><th>名称</th><th class="text-right">金额 (¥)</th></tr></thead>
-        <tbody id="summaryTable"></tbody>
-      </table>
-    </div>
-  </div>
-  <div class="mobile-only mobile-card-list" id="summaryCardList"></div>
-  </div>
-</div>
+  var monthlyRate=rateType==='month'?(loan.rate/100):(loan.rate/100/12);
+  return {days:days,periods:periods,interest:loan.principal*monthlyRate*periods,unit:'month'};
+}
 
-<!-- 资产管理 -->
-<div class="page" id="page-assets">
-  <div class="page-content">
-  <div class="flex-between mb-16">
-    <div class="page-title" style="margin:0">资产管理</div>
-    <button class="btn btn-primary" onclick="openModal('asset')">＋ 添加资产</button>
-  </div>
-  <div class="interest-info">
-    <div style="display:flex;gap:24px;flex-wrap:wrap">
-      <div><div class="label">资产总额 (折合人民币)</div><div class="value" id="totalAssetsSum">¥0.00</div></div>
-      <div><div class="label">预估月收益</div><div class="value" id="totalMonthlyIncome">¥0.00</div></div>
-      <div><div class="label">预估年收益</div><div class="value" id="totalAnnualIncome">¥0.00</div></div>
-    </div>
-    <div id="ratesInfo" style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6"></div>
-  </div>
-  <div class="card desktop-only">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>类别</th><th>名称</th><th>币种</th><th>金额</th><th>年化收益率</th><th>月收益</th><th>年收益</th><th>备注</th><th>操作</th></tr></thead>
-        <tbody id="assetsTable"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="assetsEmpty" style="display:none"><div class="icon">📭</div>暂无资产记录，点击上方按钮添加</div>
-  </div>
-  <div class="mobile-only mobile-card-list" id="assetsCardList"></div>
-  </div>
-</div>
+function calcRemainingDebt(l){
+  var td=l.totalDebt||0,mp=l.monthlyPrincipal||0,paid=l.paidPeriods||0;
+  return (td>0&&mp>0)?Math.max(0,td-mp*paid):td;
+}
 
-<!-- 负债管理 -->
-<div class="page" id="page-liabilities">
-  <div class="page-content">
-  <div class="flex-between mb-16">
-    <div class="page-title" style="margin:0">负债管理</div>
-    <button class="btn btn-primary" onclick="openModal('liability')">＋ 添加负债</button>
-  </div>
-  <div class="debt-summary">
-    <div style="display:flex;gap:24px;flex-wrap:wrap">
-      <div><div class="label">剩余负债总额</div><div class="value" id="totalRemainingDebt">¥0.00</div></div>
-      <div><div class="label">每月还款总额</div><div class="value" id="totalMonthlyPayment">¥0.00</div></div>
-    </div>
-  </div>
-  <div class="card desktop-only">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>类别</th><th>名称</th><th>贷款总额</th><th>总期数</th><th>已还期数</th><th>剩余本金</th><th>月还本金</th><th>月利息</th><th>费率</th><th>还款日</th><th class="text-right">月还总额</th><th>操作</th></tr></thead>
-        <tbody id="liabilitiesTable"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="liabilitiesEmpty" style="display:none"><div class="icon">📭</div>暂无负债记录，点击上方按钮添加</div>
-  </div>
-  <div class="mobile-only mobile-card-list" id="liabilitiesCardList"></div>
-  </div>
-</div>
+function openModal(type, id){
+  document.getElementById('itemType').value=type;
+  var isLoan=type==='loan',isLiab=type==='liability',isAsset=type==='asset',isIncome=type==='income';
 
-<!-- 借出款管理 -->
-<div class="page" id="page-loans">
-  <div class="page-content">
-  <div class="flex-between mb-16">
-    <div class="page-title" style="margin:0">借出款管理</div>
-    <button class="btn btn-primary" onclick="openModal('loan')">＋ 添加借出款</button>
-  </div>
-  <div class="interest-info">
-    <div style="display:flex;gap:24px;flex-wrap:wrap">
-      <div><div class="label">借出本金总计</div><div class="value" id="totalLoanPrincipal">¥0.00</div></div>
-      <div><div class="label">累计应收利息</div><div class="value" id="totalLoanInterest">¥0.00</div></div>
-      <div><div class="label">本息合计</div><div class="value" id="totalLoanAll">¥0.00</div></div>
-    </div>
-  </div>
-  <div class="card desktop-only">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>借款人</th><th>本金</th><th>利率</th><th>利率类型</th><th>起始日期</th><th>还款日</th><th>已收期数</th><th class="text-right">累计利息</th><th>操作</th></tr></thead>
-        <tbody id="loansTable"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="loansEmpty" style="display:none"><div class="icon">📭</div>暂无借出款记录</div>
-  </div>
-  <div class="mobile-only mobile-card-list" id="loansCardList"></div>
-  </div>
-</div>
+  document.getElementById('fieldsGeneral').style.display=(isLoan||isIncome)?'none':'';
+  document.getElementById('fieldsLoan').style.display=isLoan?'':'none';
+  document.getElementById('fieldsLiabilityExtra').style.display=isLiab?'':'none';
+  document.getElementById('fieldAmountGroup').style.display=isLiab?'none':'';
+  document.getElementById('fieldsAssetExtra').style.display=isAsset?'':'none';
+  document.getElementById('fieldsIncome').style.display=isIncome?'':'none';
 
-<!-- 主动收入 -->
-<div class="page" id="page-incomes">
-  <div class="page-content">
-  <div class="flex-between mb-16">
-    <div class="page-title" style="margin:0">主动收入</div>
-    <button class="btn btn-primary" onclick="openModal('income')">＋ 添加收入</button>
-  </div>
-  <div class="income-summary">
-    <div style="display:flex;gap:24px;flex-wrap:wrap">
-      <div><div class="label">月主动收入总额</div><div class="value" id="totalActiveIncome">¥0.00</div></div>
-      <div><div class="label">年主动收入总额</div><div class="value" id="totalActiveIncomeYear">¥0.00</div></div>
-    </div>
-  </div>
-  <div class="card desktop-only">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>类别</th><th>名称</th><th class="text-right">月收入 (¥)</th><th>备注</th><th>操作</th></tr></thead>
-        <tbody id="incomesTable"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="incomesEmpty" style="display:none"><div class="icon">📭</div>暂无主动收入记录</div>
-  </div>
-  <div class="mobile-only mobile-card-list" id="incomesCardList"></div>
-  </div>
-</div>
+  document.getElementById('fieldName').required=(!isLoan&&!isIncome);
+  document.getElementById('fieldAmount').required=(!isLoan&&!isLiab&&!isIncome);
+  document.getElementById('loanBorrower').required=isLoan;
+  document.getElementById('loanPrincipal').required=isLoan;
+  document.getElementById('loanStartDate').required=isLoan;
 
-<!-- 数据管理 -->
-<div class="page" id="page-settings">
-  <div class="page-content">
-  <div class="page-title">数据管理</div>
-  <div class="card">
-    <h3 style="margin-bottom:12px">导出数据</h3>
-    <p style="color:var(--text2);font-size:13px;margin-bottom:12px">将所有数据导出为 JSON 文件，用于备份或迁移。</p>
-    <button class="btn btn-primary" onclick="exportData()">📥 导出 JSON</button>
-  </div>
-  <div class="card">
-    <h3 style="margin-bottom:12px">导入数据</h3>
-    <p style="color:var(--text2);font-size:13px;margin-bottom:12px">从 JSON 文件恢复数据。注意：将覆盖当前所有数据。</p>
-    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
-    <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 选择文件导入</button>
-  </div>
-  <div class="card">
-    <h3 style="margin-bottom:12px;color:var(--danger)">清空数据</h3>
-    <p style="color:var(--text2);font-size:13px;margin-bottom:12px">删除所有资产和负债记录，此操作不可恢复。</p>
-    <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有数据</button>
-  </div>
-  </div>
-</div>
+  if(isAsset){
+    document.getElementById('modalTitle').textContent=id?'编辑资产':'添加资产';
+    document.getElementById('fieldAmount').required=true;
+    populateCats(assetCategories);
+  } else if(isLiab){
+    document.getElementById('modalTitle').textContent=id?'编辑负债':'添加负债';
+    document.getElementById('fieldAmount').required=false;
+    populateCats(liabilityCategories);
+  } else if(isIncome){
+    document.getElementById('modalTitle').textContent=id?'编辑收入':'添加收入';
+  } else {
+    document.getElementById('modalTitle').textContent=id?'编辑借出款':'添加借出款';
+  }
 
-</div>
-</div>
+  if(id){
+    document.getElementById('itemId').value=id;
+    if(isLoan){
+      var item=data.loans.find(function(l){return l.id===id});
+      if(item){
+        document.getElementById('loanBorrower').value=item.borrower||'';
+        document.getElementById('loanPrincipal').value=item.principal||'';
+        document.getElementById('loanRate').value=item.rate||'';
+        document.getElementById('loanRateType').value=item.rateType||'year';
+        document.getElementById('loanStartDate').value=item.startDate||'';
+        document.getElementById('loanRepayDay').value=item.repayDay||'';
+        document.getElementById('loanPaidPeriods').value=(item.paidPeriods!=null&&item.paidPeriods!=='')?item.paidPeriods:'';
+        document.getElementById('loanNote').value=item.note||'';
+      }
+    } else if(isIncome){
+      var inc=data.incomes.find(function(i){return i.id===id});
+      if(inc){
+        document.getElementById('incomeCategory').value=inc.category||'';
+        document.getElementById('incomeName').value=inc.name||'';
+        document.getElementById('incomeAmount').value=inc.amount||'';
+        document.getElementById('incomeNote').value=inc.note||'';
+      }
+    } else {
+      var list=isAsset?data.assets:data.liabilities;
+      var found=list.find(function(i){return i.id===id});
+      if(found){
+        document.getElementById('fieldCategory').value=found.category||'';
+        document.getElementById('fieldName').value=found.name||'';
+        document.getElementById('fieldAmount').value=found.amount||'';
+        document.getElementById('fieldCurrency').value=found.currency||'CNY';
+        document.getElementById('fieldNote').value=found.note||'';
+        if(isAsset){
+          document.getElementById('assetAnnualRate').value=found.annualRate||'';
+          var sd=document.getElementById('assetStartDate');if(sd) sd.value=found.startDate||'';
+          var ed=document.getElementById('assetEndDate');if(ed) ed.value=found.endDate||'';
+        }
+        if(isLiab){
+          document.getElementById('liabTotalDebt').value=found.totalDebt||'';
+          document.getElementById('liabTotalPeriods').value=found.totalPeriods||'';
+          document.getElementById('liabPaidPeriods').value=found.paidPeriods||'';
+          document.getElementById('liabStartDate').value=found.startDate||'';
+          document.getElementById('liabMonthlyPrincipal').value=found.monthlyPrincipal||'';
+          document.getElementById('liabMonthlyInterest').value=found.monthlyInterest||'';
+          document.getElementById('liabFeeRate').value=found.feeRate||'';
+          document.getElementById('liabRepayDay').value=found.repayDay||'';
+        }
+      }
+    }
+  } else {
+    document.getElementById('itemId').value='';
+    document.getElementById('modalForm').reset();
+    document.getElementById('fieldCurrency').value='CNY';
+    if(isLoan) document.getElementById('loanRateType').value='year';
+    if(isAsset){
+      var sd2=document.getElementById('assetStartDate');if(sd2) sd2.value='';
+      var ed2=document.getElementById('assetEndDate');if(ed2) ed2.value='';
+    }
+  }
+  document.getElementById('modalOverlay').classList.add('show');
+}
 
-<!-- 弹窗 -->
-<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal">
-    <div class="modal-title" id="modalTitle">添加</div>
-    <form id="modalForm" onsubmit="saveItem(event)">
-      <input type="hidden" id="itemId">
-      <input type="hidden" id="itemType">
-      <div id="fieldsGeneral">
-        <div class="form-group"><label>类别</label><select id="fieldCategory"><option value="">请选择</option></select></div>
-        <div class="form-group"><label>名称</label><input type="text" id="fieldName" placeholder="例如：招商银行活期" required></div>
-        <div class="form-row">
-          <div class="form-group"><label>币种</label>
-            <select id="fieldCurrency">
-              <option value="CNY">🇨🇳 人民币 (CNY)</option>
-              <option value="USD">🇺🇸 美元 (USD)</option>
-              <option value="EUR">🇪🇺 欧元 (EUR)</option>
-              <option value="GBP">🇬🇧 英镑 (GBP)</option>
-              <option value="JPY">🇯🇵 日元 (JPY)</option>
-              <option value="HKD">🇭🇰 港币 (HKD)</option>
-              <option value="USDT">💲 USDT</option>
-            </select>
-          </div>
-          <div class="form-group" id="fieldAmountGroup"><label>金额</label><input type="number" id="fieldAmount" step="0.01" placeholder="0.00" required></div>
-        </div>
-        <div id="fieldsAssetExtra" style="display:none">
-          <div class="form-row">
-            <div class="form-group"><label>年化收益率 (%)</label><input type="number" id="assetAnnualRate" step="0.01" placeholder="例如：2.5"><div class="hint">填写后自动计算月/年收益</div></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label>开始日期（可选）</label><input type="date" id="assetStartDate"><div class="hint">用于定期存款/理财：开始到到期按单利计息</div></div>
-            <div class="form-group"><label>到期日期（可选）</label><input type="date" id="assetEndDate"><div class="hint">到期后仅标记保留记录，不再计入现金流</div></div>
-          </div>
-        </div>
-        <div class="form-group"><label>备注</label><input type="text" id="fieldNote" placeholder="可选"></div>
-      </div>
-      <div id="fieldsLiabilityExtra" style="display:none">
-        <hr class="section-divider">
-        <div class="form-row">
-          <div class="form-group"><label>贷款总额 (¥)</label><input type="number" id="liabTotalDebt" step="0.01" placeholder="例如：324000"></div>
-          <div class="form-group"><label>总期数 (月)</label><input type="number" id="liabTotalPeriods" min="1" placeholder="例如：60"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>已还期数</label><input type="number" id="liabPaidPeriods" min="0" placeholder="例如：12"></div>
-          <div class="form-group"><label>起始日期</label><input type="date" id="liabStartDate"></div>
-        </div>
-        <hr class="section-divider">
-        <div class="form-row">
-          <div class="form-group"><label>每月还本金 (¥)</label><input type="number" id="liabMonthlyPrincipal" step="0.01" placeholder="0.00"><div class="hint">贷款总额÷总期数自动算</div></div>
-          <div class="form-group"><label>每月利息 (¥)</label><input type="number" id="liabMonthlyInterest" step="0.01" placeholder="0.00"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>费率 (%)</label><input type="number" id="liabFeeRate" step="0.001" placeholder="例如：0.433"></div>
-          <div class="form-group"><label>每月还款日</label><input type="number" id="liabRepayDay" min="1" max="31" placeholder="例如：21"></div>
-        </div>
-      </div>
-      <div id="fieldsLoan" style="display:none">
-        <div class="form-group"><label>借款人</label><input type="text" id="loanBorrower" placeholder="借给谁"></div>
-        <div class="form-group"><label>本金 (¥)</label><input type="number" id="loanPrincipal" step="0.01" placeholder="0.00"></div>
-        <div class="form-row">
-          <div class="form-group"><label>利率 (%)</label><input type="number" id="loanRate" step="0.01" placeholder="例如：5"></div>
-          <div class="form-group"><label>利率类型</label>
-            <select id="loanRateType"><option value="year">年利率</option><option value="month">月利率</option><option value="day">日利率</option></select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>起始日期</label><input type="date" id="loanStartDate"></div>
-          <div class="form-group"><label>每月还款日</label><input type="number" id="loanRepayDay" min="1" max="31" placeholder="例如：15"><div class="hint">按此日期计算利息周期</div></div>
-        </div>
-        <div class="form-group"><label>已收期数</label><input type="number" id="loanPaidPeriods" min="0" placeholder="手动填写已收利息期数"><div class="hint">填写后优先使用此值</div></div>
-        <div class="form-group"><label>备注</label><input type="text" id="loanNote" placeholder="可选"></div>
-      </div>
-      <div id="fieldsIncome" style="display:none">
-        <div class="form-group"><label>类别</label>
-          <select id="incomeCategory">
-            <option value="">请选择</option>
-            <option value="打工/上班">打工/上班</option>
-            <option value="企业经营">企业经营</option>
-            <option value="公司分红">公司分红</option>
-            <option value="兼职副业">兼职副业</option>
-            <option value="自由职业">自由职业</option>
-            <option value="其他收入">其他收入</option>
-          </select>
-        </div>
-        <div class="form-group"><label>名称</label><input type="text" id="incomeName" placeholder="例如：XX公司工资"></div>
-        <div class="form-group"><label>月收入 (¥)</label><input type="number" id="incomeAmount" step="0.01" placeholder="0.00"></div>
-        <div class="form-group"><label>备注</label><input type="text" id="incomeNote" placeholder="可选"></div>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-outline" onclick="closeModal()">取消</button>
-        <button type="submit" class="btn btn-primary">保存</button>
-      </div>
-    </form>
-  </div>
-</div>
-<script src="app.js?v=20260221"></script>
-</body>
-</html>
+function closeModal(){document.getElementById('modalOverlay').classList.remove('show')}
+
+function populateCats(cats){
+  var sel=document.getElementById('fieldCategory');
+  sel.innerHTML='<option value="">请选择</option>'+cats.map(function(c){return '<option value="'+c+'">'+c+'</option>'}).join('');
+}
+
+function saveItem(e){
+  e.preventDefault();
+  var type=document.getElementById('itemType').value;
+  var id=document.getElementById('itemId').value;
+
+  if(type==='loan'){
+    var ppVal=document.getElementById('loanPaidPeriods').value;
+    var item={id:id||genId(),borrower:document.getElementById('loanBorrower').value.trim(),principal:parseFloat(document.getElementById('loanPrincipal').value)||0,rate:parseFloat(document.getElementById('loanRate').value)||0,rateType:document.getElementById('loanRateType').value,startDate:document.getElementById('loanStartDate').value,repayDay:parseInt(document.getElementById('loanRepayDay').value)||0,paidPeriods:(ppVal!==''?parseInt(ppVal):null),note:document.getElementById('loanNote').value.trim()};
+    if(id){var idx=data.loans.findIndex(function(l){return l.id===id});if(idx>=0)data.loans[idx]=item}else data.loans.push(item);
+  } else if(type==='income'){
+    var item4={id:id||genId(),category:document.getElementById('incomeCategory').value,name:document.getElementById('incomeName').value.trim(),amount:parseFloat(document.getElementById('incomeAmount').value)||0,note:document.getElementById('incomeNote').value.trim()};
+    if(id){var idx4=data.incomes.findIndex(function(i){return i.id===id});if(idx4>=0)data.incomes[idx4]=item4}else data.incomes.push(item4);
+  } else if(type==='liability'){
+    var totalDebt=parseFloat(document.getElementById('liabTotalDebt').value)||0;
+    var totalPeriods=parseInt(document.getElementById('liabTotalPeriods').value)||0;
+    var paidPeriods=parseInt(document.getElementById('liabPaidPeriods').value)||0;
+    var mp=parseFloat(document.getElementById('liabMonthlyPrincipal').value)||0;
+    var mi=parseFloat(document.getElementById('liabMonthlyInterest').value)||0;
+    if(mp===0&&totalDebt>0&&totalPeriods>0) mp=Math.round(totalDebt/totalPeriods*100)/100;
+    var remaining=totalDebt>0?Math.max(0,totalDebt-mp*paidPeriods):0;
+    var item2={id:id||genId(),category:document.getElementById('fieldCategory').value,name:document.getElementById('fieldName').value.trim(),amount:remaining,totalDebt:totalDebt,totalPeriods:totalPeriods,paidPeriods:paidPeriods,startDate:document.getElementById('liabStartDate').value,monthlyPrincipal:mp,monthlyInterest:mi,monthlyTotal:mp+mi,feeRate:parseFloat(document.getElementById('liabFeeRate').value)||0,repayDay:parseInt(document.getElementById('liabRepayDay').value)||0,note:document.getElementById('fieldNote').value.trim()};
+    if(id){var idx2=data.liabilities.findIndex(function(l){return l.id===id});if(idx2>=0)data.liabilities[idx2]=item2}else data.liabilities.push(item2);
+  } else {
+    var annualRate=parseFloat(document.getElementById('assetAnnualRate').value)||0;
+    var amt=parseFloat(document.getElementById('fieldAmount').value)||0;
+    var sd3=document.getElementById('assetStartDate');var ed3=document.getElementById('assetEndDate');
+    var item3={id:id||genId(),category:document.getElementById('fieldCategory').value,name:document.getElementById('fieldName').value.trim(),currency:document.getElementById('fieldCurrency').value,amount:amt,annualRate:annualRate,startDate:(sd3?sd3.value:''),endDate:(ed3?ed3.value:''),note:document.getElementById('fieldNote').value.trim()};
+    if(id){var idx3=data.assets.findIndex(function(a){return a.id===id});if(idx3>=0)data.assets[idx3]=item3}else data.assets.push(item3);
+  }
+  saveStore();closeModal();refreshAll();
+}
+
+function deleteItem(type,id){
+  if(!confirm('确定要删除吗？'))return;
+  if(type==='asset')data.assets=data.assets.filter(function(a){return a.id!==id});
+  else if(type==='liability')data.liabilities=data.liabilities.filter(function(l){return l.id!==id});
+  else if(type==='income')data.incomes=data.incomes.filter(function(i){return i.id!==id});
+  else data.loans=data.loans.filter(function(l){return l.id!==id});
+  saveStore();refreshAll();
+}
+
+function refreshAll(){renderAssets();renderLiabilities();renderLoans();renderIncomes();refreshDashboard()}
+
+function renderAssets(){
+  var tb=document.getElementById('assetsTable');
+  var empty=document.getElementById('assetsEmpty');
+  var mcl=document.getElementById('assetsCardList');
+  if(data.assets.length===0){
+    tb.innerHTML='';empty.style.display='';if(mcl)mcl.innerHTML='<div class="empty"><div class="icon">📭</div>暂无资产记录</div>';
+    document.getElementById('totalAssetsSum').textContent=fmtCNY(0);
+    document.getElementById('totalMonthlyIncome').textContent=fmtCNY(0);
+    document.getElementById('totalAnnualIncome').textContent=fmtCNY(0);
+    return;
+  }
+  empty.style.display='none';
+  var sumCNY=0,sumMonthly=0,sumAnnual=0;
+  tb.innerHTML=data.assets.map(function(a){
+    var cur=a.currency||'CNY';
+    var curLabel=currencyLabels[cur]||cur;
+    var rate=a.annualRate||0;
+    var term=assetTermMeta(a);
+    var annualIncome=a.amount*rate/100;
+    var monthlyIncome=term?(a.amount*rate/100/365*30):(annualIncome/12);
+    var amtCNY=toCNY(a.amount,cur);
+    var annualCNY=toCNY(annualIncome,cur);
+    var monthlyCNY=toCNY(monthlyIncome,cur);
+    var activeIncome=(term?term.active:true);
+    sumCNY+=amtCNY;sumMonthly+=(activeIncome?monthlyCNY:0);sumAnnual+=(activeIncome?annualCNY:0);
+    var cnyNote=(cur!=='CNY')?'<br><span style="font-size:11px;color:var(--text2)">≈'+fmtCNY(amtCNY)+'</span>':'';
+    var termText='';
+    if(term){
+      var status=term.ended?'已到期':(term.started?'进行中':'未开始');
+      var dailyInt=a.amount*rate/100/365;
+      var accInt=dailyInt*term.daysAccrued;
+      termText='<br><span style="font-size:11px;color:var(--text2)">到期：'+(a.endDate||'-')+(term.ended?'（已到期）':('（剩余'+term.daysLeft+'天）'))+' · 已计息'+term.daysAccrued+'天 · 累计利息 '+(rate?fmt(accInt,cur):'-')+'</span>';
+    }
+    var mShow=(rate&&(term?term.active:true))?fmt(monthlyIncome,cur):'-';
+    var aShow=(rate&&(term?term.active:true))?fmt(annualIncome,cur):'-';
+    return '<tr><td>'+a.category+'</td><td>'+a.name+'</td><td>'+curLabel+'</td><td class="amount">'+fmt(a.amount,cur)+cnyNote+'</td><td>'+(rate?rate+'%':'-')+'</td><td class="amount" style="color:var(--success)">'+mShow+'</td><td class="amount" style="color:var(--success)">'+aShow+'</td><td>'+(a.note||'-')+termText+'</td><td><button class="btn btn-outline btn-sm" onclick="openModal(\'asset\',\''+a.id+'\')">编辑</button> <button class="btn btn-danger btn-sm" onclick="deleteItem(\'asset\',\''+a.id+'\')">删除</button></td></tr>';
+  }).join('');
+  document.getElementById('totalAssetsSum').textContent=fmtCNY(sumCNY);
+  document.getElementById('totalMonthlyIncome').textContent=fmtCNY(sumMonthly);
+  document.getElementById('totalAnnualIncome').textContent=fmtCNY(sumAnnual);
+  // Mobile cards
+  if(mcl){var mc='';data.assets.forEach(function(a){var cur=a.currency||'CNY';var rate=a.annualRate||0;var amtCNY=toCNY(a.amount,cur);var term=assetTermMeta(a);var mi=term?(a.amount*rate/100/365*30):(a.amount*rate/100/12);var dailyInt=a.amount*rate/100/365;var accInt=(term?dailyInt*term.daysAccrued:0);var activeIncome=(term?term.active:true);mc+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+a.name+'</div><div class="m-card-subtitle">'+a.category+(cur!=='CNY'?' · '+currencyLabels[cur]:'')+'</div></div><div class="m-card-amount" style="color:var(--success)">'+fmt(a.amount,cur)+'</div></div>'+(cur!=='CNY'?'<div class="m-card-row"><span>折合人民币</span><span>'+fmtCNY(amtCNY)+'</span></div>':'')+(term?'<div class="m-card-row"><span>到期</span><span>'+a.endDate+(term.ended?'（已到期）':('（剩余'+term.daysLeft+'天）'))+'</span></div><div class="m-card-row"><span>已计息</span><span>'+term.daysAccrued+'天</span></div>'+(rate?'<div class="m-card-row"><span>累计利息</span><span>'+fmt(accInt,cur)+'</span></div>':''):'')+(rate&&activeIncome?'<div class="m-card-row"><span>年化 '+rate+'%</span><span>月收益 '+fmt(mi,cur)+'</span></div>':(rate&&!activeIncome?'<div class="m-card-row"><span>年化 '+rate+'%</span><span>已到期不计入现金流</span></div>':''))+(a.note?'<div class="m-card-row"><span>备注</span><span>'+a.note+'</span></div>':'')+'<div class="m-card-actions"><button class="btn btn-outline btn-sm" onclick="openModal(\'asset\',\''+a.id+'\')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteItem(\'asset\',\''+a.id+'\')">删除</button></div></div>'});mcl.innerHTML=mc}
+}
+
+function renderLiabilities(){
+  var tb=document.getElementById('liabilitiesTable');
+  var empty=document.getElementById('liabilitiesEmpty');
+  var mcl=document.getElementById('liabilitiesCardList');
+  if(data.liabilities.length===0){tb.innerHTML='';empty.style.display='';if(mcl)mcl.innerHTML='<div class="empty"><div class="icon">📭</div>暂无负债记录</div>';document.getElementById('totalRemainingDebt').textContent=fmtCNY(0);document.getElementById('totalMonthlyPayment').textContent=fmtCNY(0);return}
+  empty.style.display='none';
+  var sumR=0,sumM=0;
+  tb.innerHTML=data.liabilities.map(function(l){
+    var rem=calcRemainingDebt(l),mt=(l.monthlyPrincipal||0)+(l.monthlyInterest||0);sumR+=rem;sumM+=mt;
+    return '<tr><td>'+l.category+'</td><td>'+l.name+'</td><td class="amount">'+fmtCNY(l.totalDebt||0)+'</td><td>'+(l.totalPeriods?l.totalPeriods+'期':'-')+'</td><td>'+(l.paidPeriods!=null?l.paidPeriods+'期':'-')+'</td><td class="amount" style="color:var(--danger)">'+fmtCNY(rem)+'</td><td class="amount">'+fmtCNY(l.monthlyPrincipal||0)+'</td><td class="amount">'+fmtCNY(l.monthlyInterest||0)+'</td><td>'+(l.feeRate?l.feeRate+'%':'-')+'</td><td>'+(l.repayDay?'每月'+l.repayDay+'号':'-')+'</td><td class="text-right amount">'+fmtCNY(mt)+'</td><td><button class="btn btn-outline btn-sm" onclick="openModal(\'liability\',\''+l.id+'\')">编辑</button> <button class="btn btn-danger btn-sm" onclick="deleteItem(\'liability\',\''+l.id+'\')">删除</button></td></tr>';
+  }).join('');
+  document.getElementById('totalRemainingDebt').textContent=fmtCNY(sumR);
+  document.getElementById('totalMonthlyPayment').textContent=fmtCNY(sumM);
+  if(mcl){var mc='';data.liabilities.forEach(function(l){var rem=calcRemainingDebt(l),mt=(l.monthlyPrincipal||0)+(l.monthlyInterest||0);mc+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+l.name+'</div><div class="m-card-subtitle">'+l.category+'</div></div><div class="m-card-amount" style="color:var(--danger)">'+fmtCNY(rem)+'</div></div><div class="m-card-row"><span>贷款总额</span><span>'+fmtCNY(l.totalDebt||0)+'</span></div><div class="m-card-row"><span>进度</span><span>'+(l.paidPeriods||0)+'/'+(l.totalPeriods||'-')+'期</span></div><div class="m-card-row"><span>月还款</span><span>'+fmtCNY(mt)+'</span></div>'+(l.repayDay?'<div class="m-card-row"><span>还款日</span><span>每月'+l.repayDay+'号</span></div>':'')+'<div class="m-card-actions"><button class="btn btn-outline btn-sm" onclick="openModal(\'liability\',\''+l.id+'\')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteItem(\'liability\',\''+l.id+'\')">删除</button></div></div>'});mcl.innerHTML=mc}
+}
+
+function renderLoans(){
+  var tb=document.getElementById('loansTable');
+  var empty=document.getElementById('loansEmpty');
+  var mcl=document.getElementById('loansCardList');
+  if(data.loans.length===0){tb.innerHTML='';empty.style.display='';if(mcl)mcl.innerHTML='<div class="empty"><div class="icon">📭</div>暂无借出款记录</div>';document.getElementById('totalLoanPrincipal').textContent=fmtCNY(0);document.getElementById('totalLoanInterest').textContent=fmtCNY(0);document.getElementById('totalLoanAll').textContent=fmtCNY(0);return}
+  empty.style.display='none';
+  var tP=0,tI=0;
+  tb.innerHTML=data.loans.map(function(l){
+    var c=calcLoanInterest(l);tP+=l.principal;tI+=c.interest;
+    var repayDayText=l.repayDay?'每月'+l.repayDay+'号':'-';
+    var periodsText=c.unit==='day'?c.periods+'天':c.periods+'期';
+    var manualTag=(l.paidPeriods!=null&&l.paidPeriods!=='')?'<span style="color:var(--primary);font-size:11px"> (手动)</span>':'';
+    return '<tr><td>'+l.borrower+'</td><td class="amount">'+fmtCNY(l.principal)+'</td><td>'+l.rate+'%</td><td>'+(rateTypeLabels[l.rateType]||'年利率')+'</td><td>'+l.startDate+'</td><td>'+repayDayText+'</td><td>'+periodsText+manualTag+'</td><td class="text-right amount">'+fmtCNY(c.interest)+'</td><td><button class="btn btn-outline btn-sm" onclick="openModal(\'loan\',\''+l.id+'\')">编辑</button> <button class="btn btn-danger btn-sm" onclick="deleteItem(\'loan\',\''+l.id+'\')">删除</button></td></tr>';
+  }).join('');
+  document.getElementById('totalLoanPrincipal').textContent=fmtCNY(tP);
+  document.getElementById('totalLoanInterest').textContent=fmtCNY(tI);
+  document.getElementById('totalLoanAll').textContent=fmtCNY(tP+tI);
+  if(mcl){var mc='';data.loans.forEach(function(l){var c=calcLoanInterest(l);var pText=c.unit==='day'?c.periods+'天':c.periods+'期';var manualTag=(l.paidPeriods!=null&&l.paidPeriods!=='')?'(手动)':'';mc+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+l.borrower+'</div><div class="m-card-subtitle">'+(rateTypeLabels[l.rateType]||'年利率')+' '+l.rate+'%</div></div><div class="m-card-amount" style="color:var(--primary)">'+fmtCNY(c.interest)+'</div></div><div class="m-card-row"><span>本金</span><span>'+fmtCNY(l.principal)+'</span></div><div class="m-card-row"><span>已收</span><span>'+pText+' '+manualTag+'</span></div>'+(l.repayDay?'<div class="m-card-row"><span>还款日</span><span>每月'+l.repayDay+'号</span></div>':'')+'<div class="m-card-row"><span>起始</span><span>'+l.startDate+'</span></div><div class="m-card-actions"><button class="btn btn-outline btn-sm" onclick="openModal(\'loan\',\''+l.id+'\')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteItem(\'loan\',\''+l.id+'\')">删除</button></div></div>'});mcl.innerHTML=mc}
+}
+
+function renderIncomes(){
+  var tb=document.getElementById('incomesTable');
+  var empty=document.getElementById('incomesEmpty');
+  var mcl=document.getElementById('incomesCardList');
+  if(!data.incomes||data.incomes.length===0){
+    tb.innerHTML='';empty.style.display='';if(mcl)mcl.innerHTML='<div class="empty"><div class="icon">📭</div>暂无主动收入记录</div>';
+    document.getElementById('totalActiveIncome').textContent=fmtCNY(0);
+    document.getElementById('totalActiveIncomeYear').textContent=fmtCNY(0);
+    return;
+  }
+  empty.style.display='none';
+  var sum=0;
+  tb.innerHTML=data.incomes.map(function(i){
+    sum+=i.amount;
+    return '<tr><td>'+i.category+'</td><td>'+i.name+'</td><td class="text-right amount">'+fmtCNY(i.amount)+'</td><td>'+(i.note||'-')+'</td><td><button class="btn btn-outline btn-sm" onclick="openModal(\'income\',\''+i.id+'\')">编辑</button> <button class="btn btn-danger btn-sm" onclick="deleteItem(\'income\',\''+i.id+'\')">删除</button></td></tr>';
+  }).join('');
+  document.getElementById('totalActiveIncome').textContent=fmtCNY(sum);
+  document.getElementById('totalActiveIncomeYear').textContent=fmtCNY(sum*12);
+  if(mcl){var mc='';data.incomes.forEach(function(i){mc+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+i.name+'</div><div class="m-card-subtitle">'+i.category+'</div></div><div class="m-card-amount" style="color:var(--warning)">'+fmtCNY(i.amount)+'/月</div></div>'+(i.note?'<div class="m-card-row"><span>备注</span><span>'+i.note+'</span></div>':'')+'<div class="m-card-actions"><button class="btn btn-outline btn-sm" onclick="openModal(\'income\',\''+i.id+'\')">编辑</button><button class="btn btn-danger btn-sm" onclick="deleteItem(\'income\',\''+i.id+'\')">删除</button></div></div>'});mcl.innerHTML=mc}
+}
+
+var assetChartInstance=null,liabilityChartInstance=null;
+var chartColors=['#0984e3','#00b894','#fdcb6e','#e17055','#6c5ce7','#00cec9','#fab1a0','#74b9ff'];
+var assetBarColors=['rgba(10,132,255,.92)','rgba(52,199,89,.9)','rgba(0,206,201,.88)','rgba(116,185,255,.9)','rgba(108,92,231,.88)','rgba(142,142,147,.7)'];
+var liabilityBarColors=['rgba(255,69,58,.92)','rgba(255,149,0,.9)','rgba(255,59,48,.84)','rgba(225,112,85,.86)','rgba(253,203,110,.86)','rgba(142,142,147,.7)'];
+
+function buildTopGroups(groups,topN){
+  var rows=Object.keys(groups).map(function(k){return {label:k,value:groups[k]||0}}).filter(function(x){return x.value>0}).sort(function(a,b){return b.value-a.value});
+  if(rows.length===0) return {labels:['暂无数据'],values:[0],percents:[0],isEmpty:true};
+  if(rows.length>topN){
+    var other=rows.slice(topN).reduce(function(s,x){return s+x.value},0);
+    rows=rows.slice(0,topN);
+    if(other>0) rows.push({label:'其他',value:other});
+  }
+  var total=rows.reduce(function(s,x){return s+x.value},0)||1;
+  return {labels:rows.map(function(x){return x.label}),values:rows.map(function(x){return x.value}),percents:rows.map(function(x){return x.value/total*100}),isEmpty:false};
+}
+
+function renderCompositionBarChart(canvasId,instance,chartData,colors){
+  if(instance) instance.destroy();
+  var canvas=document.getElementById(canvasId);
+  if(!canvas) return null;
+  var targetHeight=chartData.isEmpty?220:Math.min(360,Math.max(220,chartData.labels.length*44));
+  canvas.style.height=targetHeight+'px';
+  canvas.style.maxHeight=targetHeight+'px';
+  canvas.style.width='100%';
+  var palette=(colors||chartColors).slice(0,chartData.labels.length);
+  if(chartData.isEmpty) palette=['rgba(174,174,178,.45)'];
+  var style=getComputedStyle(document.body),text=style.getPropertyValue('--text').trim(),text2=style.getPropertyValue('--text2').trim();
+  return new Chart(canvas.getContext('2d'),{
+    type:'bar',
+    data:{labels:chartData.labels,datasets:[{data:chartData.values,backgroundColor:palette,borderRadius:10,borderSkipped:false,maxBarThickness:20}]},
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{enabled:!chartData.isEmpty,callbacks:{label:function(ctx){var i=ctx.dataIndex,p=chartData.percents[i]||0;return fmtCNY(ctx.raw)+' ('+p.toFixed(1)+'%)';}}}
+      },
+      scales:{
+        x:{beginAtZero:true,grid:{color:'rgba(142,142,147,.18)'},border:{display:false},ticks:{color:text2,maxTicksLimit:4,callback:function(v){return fmtCNYShort(v)}}},
+        y:{grid:{display:false},border:{display:false},ticks:{color:text,font:{size:12}}}
+      }
+    }
+  });
+}
+
+function refreshDashboard(){
+  var totalA=0;
+  data.assets.forEach(function(a){totalA+=toCNY(a.amount,a.currency||'CNY')});
+  var loanTotal=0;
+  data.loans.forEach(function(l){var c=calcLoanInterest(l);loanTotal+=l.principal+c.interest});
+  totalA+=loanTotal;
+  var totalL=0;
+  data.liabilities.forEach(function(l){totalL+=calcRemainingDebt(l)});
+  var net=totalA-totalL;
+
+  // 被动收入
+  var passiveIncome=0;
+  data.assets.forEach(function(a){
+    var rate=a.annualRate||0;
+    if(rate>0){
+      var term=assetTermMeta(a);
+      if(term){
+        if(term.active) passiveIncome+=toCNY(a.amount*rate/100/365*30,a.currency||'CNY');
+      } else passiveIncome+=toCNY(a.amount*rate/100/12,a.currency||'CNY');
+    }
+  });
+  data.loans.forEach(function(l){
+    var c=calcLoanInterest(l);
+    if(c.unit==='month'&&c.periods>0) passiveIncome+=c.interest/c.periods;
+    else if(c.unit==='day'&&c.periods>0) passiveIncome+=c.interest/c.periods*30;
+  });
+  // 主动收入
+  var activeIncome=0;
+  if(data.incomes) data.incomes.forEach(function(i){activeIncome+=i.amount});
+  var totalIncome=passiveIncome+activeIncome;
+  // 月支出
+  var monthlyExpense=0;
+  data.liabilities.forEach(function(l){monthlyExpense+=(l.monthlyPrincipal||0)+(l.monthlyInterest||0)});
+  var cashFlow=totalIncome-monthlyExpense;
+
+  document.getElementById('totalAssets').textContent=fmtCNY(totalA);
+  document.getElementById('totalLiabilities').textContent=fmtCNY(totalL);
+  var nwEl=document.getElementById('netWorth');
+  nwEl.textContent=fmtCNY(net);
+  nwEl.className='card-value '+(net>=0?'positive':'negative');
+  var cfEl=document.getElementById('monthlyCashFlow');
+  cfEl.textContent=fmtCNY(cashFlow);
+  cfEl.className='card-value '+(cashFlow>=0?'positive':'negative');
+  document.getElementById('cashFlowDetail').innerHTML='被动 '+fmtCNY(passiveIncome)+' + 主动 '+fmtCNY(activeIncome)+' - 支出 '+fmtCNY(monthlyExpense);
+
+  var rows='',cards='';
+  data.assets.forEach(function(a){
+    var cur=a.currency||'CNY';var amtCNY=toCNY(a.amount,cur);var displayAmt=fmt(a.amount,cur);
+    if(cur!=='CNY') displayAmt+=' <span style="color:var(--text2);font-size:12px">≈'+fmtCNY(amtCNY)+'</span>';
+    rows+='<tr><td><span class="tag tag-asset">资产</span></td><td>'+a.category+'</td><td>'+a.name+'</td><td class="text-right amount">'+displayAmt+'</td></tr>';
+    cards+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+a.name+'</div><div class="m-card-subtitle">资产 · '+a.category+'</div></div><div class="m-card-amount" style="color:var(--success)">'+displayAmt+'</div></div></div>';
+  });
+  data.loans.forEach(function(l){var c=calcLoanInterest(l),loanAmt=fmtCNY(l.principal+c.interest);rows+='<tr><td><span class="tag tag-asset">资产</span></td><td>借出款</td><td>'+l.borrower+' (本息)</td><td class="text-right amount">'+loanAmt+'</td></tr>';cards+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+l.borrower+' (本息)</div><div class="m-card-subtitle">资产 · 借出款</div></div><div class="m-card-amount" style="color:var(--success)">'+loanAmt+'</div></div></div>'});
+  data.liabilities.forEach(function(l){var remainAmt=fmtCNY(calcRemainingDebt(l));rows+='<tr><td><span class="tag tag-liability">负债</span></td><td>'+l.category+'</td><td>'+l.name+' (剩余)</td><td class="text-right amount">'+remainAmt+'</td></tr>';cards+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+l.name+' (剩余)</div><div class="m-card-subtitle">负债 · '+l.category+'</div></div><div class="m-card-amount" style="color:var(--danger)">'+remainAmt+'</div></div></div>'});
+  if(data.incomes) data.incomes.forEach(function(i){var incomeAmt=fmtCNY(i.amount)+'/月';rows+='<tr><td><span class="tag tag-income">主动收入</span></td><td>'+i.category+'</td><td>'+i.name+'</td><td class="text-right amount">'+incomeAmt+'</td></tr>';cards+='<div class="m-card"><div class="m-card-header"><div><div class="m-card-title">'+i.name+'</div><div class="m-card-subtitle">主动收入 · '+i.category+'</div></div><div class="m-card-amount" style="color:var(--warning)">'+incomeAmt+'</div></div></div>'});
+  document.getElementById('summaryTable').innerHTML=rows||'<tr><td colspan="4" style="text-align:center;color:var(--text2);padding:30px">暂无数据</td></tr>';
+  var summaryCardList=document.getElementById('summaryCardList');
+  if(summaryCardList) summaryCardList.innerHTML=cards||'<div class="empty"><div class="icon">📭</div>暂无数据</div>';
+
+  var assetGroups={};
+  data.assets.forEach(function(a){var cny=toCNY(a.amount,a.currency||'CNY');assetGroups[a.category]=(assetGroups[a.category]||0)+cny});
+  if(loanTotal>0)assetGroups['借出款(本息)']=loanTotal;
+  assetChartInstance=renderCompositionBarChart('assetChart',assetChartInstance,buildTopGroups(assetGroups,5),assetBarColors);
+
+  var liabGroups={};
+  data.liabilities.forEach(function(l){liabGroups[l.category]=(liabGroups[l.category]||0)+calcRemainingDebt(l)});
+  liabilityChartInstance=renderCompositionBarChart('liabilityChart',liabilityChartInstance,buildTopGroups(liabGroups,5),liabilityBarColors);
+}
+
+function exportData(){var b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download='balance_sheet_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(u)}
+
+function importData(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){try{var imp=JSON.parse(ev.target.result);data=Object.assign({},defaultData,imp);if(!data.incomes)data.incomes=[];saveStore();refreshAll();alert('数据导入成功！')}catch(err){alert('导入失败：文件格式不正确')}};r.readAsText(f);e.target.value=''}
+
+function clearAllData(){if(!confirm('确定要清空所有数据吗？此操作不可恢复！'))return;data=Object.assign({},defaultData,{theme:data.theme});saveStore();refreshAll();alert('所有数据已清空')}
+
+refreshAll();
+fetchExchangeRates();
